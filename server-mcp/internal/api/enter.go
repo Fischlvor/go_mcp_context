@@ -1,0 +1,21 @@
+package api
+
+import "go-mcp-context/internal/service"
+
+type ApiGroup struct {
+	LibraryApi
+	DocumentApi
+	SearchApi
+	MCPApi
+	AuthApi
+	UserApi
+	ApiKeyApi
+}
+
+var ApiGroupApp = new(ApiGroup)
+
+var libraryService = service.ServiceGroupApp.LibraryService
+var documentService = service.ServiceGroupApp.DocumentService
+var searchService = service.ServiceGroupApp.SearchService
+var mcpService = service.ServiceGroupApp.MCPService
+var apiKeyService = service.ServiceGroupApp.ApiKeyService
