@@ -1,0 +1,52 @@
+system:
+  host: 0.0.0.0
+  port: 8080
+  env: debug
+  router_prefix: api
+
+postgres:
+  host: localhost
+  port: 5432
+  config: sslmode=disable TimeZone=Asia/Shanghai
+  db_name: mcp_context
+  username: postgres
+  password: your_password
+  max_idle_conns: 10
+  max_open_conns: 100
+  log_mode: info
+
+redis:
+  address: localhost:6379
+  password: ""
+  db: 0
+
+embedding:
+  provider: openai
+  api_key: your_openai_api_key
+  model: text-embedding-3-small
+  dimension: 1536
+  model_path: ""
+
+chunker:
+  chunk_size: 512
+  overlap: 50
+
+cache:
+  ttl: 24h
+  prefix: "mcp:"
+
+jwt:
+  access_token_secret: your-access-token-secret-key-here
+  refresh_token_secret: your-refresh-token-secret-key-here
+  access_token_expiry_time: 2h
+  refresh_token_expiry_time: 7d
+  api_token_expiry_time: 90d
+  issuer: go_mcp_context
+
+zap:
+  level: info
+  filename: log/go_mcp_context.log
+  max_size: 200
+  max_backups: 30
+  max_age: 5
+  is_console_print: true
