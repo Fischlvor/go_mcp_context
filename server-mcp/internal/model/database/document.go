@@ -14,6 +14,7 @@ type Document struct {
 	FileSize     int64           `json:"file_size"`
 	ContentHash  string          `json:"content_hash" gorm:"size:64;index"`
 	ChunkCount   int             `json:"chunk_count" gorm:"default:0"`
+	TokenCount   int             `json:"token_count" gorm:"default:0"`
 	ErrorMessage string          `json:"error_message,omitempty" gorm:"type:text"`
 	Status       string          `json:"status" gorm:"size:20;default:'active'"`
 	Library      Library         `json:"-" gorm:"foreignKey:LibraryID"`

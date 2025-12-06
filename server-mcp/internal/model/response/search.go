@@ -11,12 +11,12 @@ type SearchResult struct {
 
 // SearchResultItem 搜索结果项
 type SearchResultItem struct {
-	ChunkID     uint    `json:"chunk_id"`
-	DocumentID  uint    `json:"document_id"`
-	LibraryID   uint    `json:"library_id"`
-	Content     string  `json:"content"`
-	ChunkType   string  `json:"chunk_type"`
-	Score       float64 `json:"score"`        // 综合分数 0-1
-	VectorScore float64 `json:"vector_score"` // 向量相似度
-	BM25Score   float64 `json:"bm25_score"`   // BM25 分数
+	ChunkID    uint    `json:"chunk_id"`
+	DocumentID uint    `json:"document_id"`
+	LibraryID  uint    `json:"library_id"`
+	Title      string  `json:"title"`     // 从 Metadata 取最深层级标题
+	Source     string  `json:"source"`    // Document.Title
+	Content    string  `json:"content"`   // ChunkText 原文
+	Tokens     int     `json:"tokens"`    // token 数
+	Relevance  float64 `json:"relevance"` // 最终相关性分数 0-1
 }

@@ -46,7 +46,9 @@ type MCPGetLibraryDocsResult struct {
 
 // MCPDocumentChunk 文档片段
 type MCPDocumentChunk struct {
-	Content   string  `json:"content"`
-	ChunkType string  `json:"chunkType"` // code, info, mixed
-	Score     float64 `json:"score"`     // 相关性分数 0-1
+	Title     string  `json:"title"`     // 标题（从 Metadata 提取）
+	Source    string  `json:"source"`    // 来源文档标题
+	Content   string  `json:"content"`   // 内容
+	Tokens    int     `json:"tokens"`    // token 数
+	Relevance float64 `json:"relevance"` // 相关性分数 0-1
 }

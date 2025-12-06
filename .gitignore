@@ -10,3 +10,7 @@ server-mcp/keys/
 
 # 日志
 server-mcp/log/
+
+# 上传文件
+server-mcp/uploads/*
+!server-mcp/uploads/documents/.gitkeep
