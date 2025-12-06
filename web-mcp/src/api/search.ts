@@ -5,11 +5,11 @@ export interface SearchResultItem {
   chunk_id: number
   document_id: number
   library_id: number
-  content: string
-  chunk_type: string
-  score: number
-  vector_score: number
-  bm25_score: number
+  title: string      // 标题（从 Metadata 提取）
+  source: string     // 来源文档标题
+  content: string    // 内容
+  tokens: number     // token 数
+  relevance: number  // 相关性分数 0-1
 }
 
 export interface SearchResult {

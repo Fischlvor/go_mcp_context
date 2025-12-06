@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { AxiosRequestConfig, InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
 import { getDeviceId } from './deviceId'
+import { getAccessToken, setAccessToken, clearAccessToken } from './token'
 
 const service = axios.create({
   baseURL: import.meta.env.VITE_BASE_API,
@@ -14,26 +15,16 @@ export interface ApiResponse<T> {
   data: T
 }
 
-// 获取 token
-const getToken = (): string | null => {
-  return localStorage.getItem('access_token')
-}
-
-// 设置 token
-const setToken = (token: string): void => {
-  localStorage.setItem('access_token', token)
-}
-
 // 清除认证信息
 const clearAuth = (): void => {
-  localStorage.removeItem('access_token')
+  clearAccessToken()
   localStorage.removeItem('user')
 }
 
 // 请求拦截器
 service.interceptors.request.use(
   (config: AxiosRequestConfig) => {
-    const token = getToken()
+    const token = getAccessToken()
     config.headers = {
       'Content-Type': 'application/json',
       'X-Device-Id': getDeviceId(),
@@ -59,10 +50,10 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   (response: AxiosResponse) => {
     // 检查是否有新的 token（自动刷新）
-    const newToken = response.headers['x-new-access-token']
+    const newToken = response.headers['X-New-Access-Token']
     if (newToken) {
-      console.log('Token 已自动刷新')
-      setToken(newToken)
+      console.log('✓ Token 已自动刷新')
+      setAccessToken(newToken)
     }
 
     // 检查业务状态码

@@ -13,11 +13,11 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// InitLogger 初始化并返回一个基于配置设置的新 zap.Logger 实例
+// InitLogger 初始化日志，使用 Gin 原生格式
 func InitLogger() *zap.Logger {
 	zapCfg := global.Config.Zap
 
-	// 创建 lumberjack 日志文件
+	// 创建 lumberjack 日志文件（支持轮转）
 	lumberJackLogger := &lumberjack.Logger{
 		Filename:   zapCfg.Filename,
 		MaxSize:    zapCfg.MaxSize,
@@ -25,49 +25,40 @@ func InitLogger() *zap.Logger {
 		MaxAge:     zapCfg.MaxAge,
 	}
 
-	// 创建一个用于日志输出的 writeSyncer
-	writeSyncer := zapcore.AddSync(lumberJackLogger)
-
-	// 如果配置了控制台输出，则添加控制台输出
+	// 设置全局日志写入器
 	if zapCfg.IsConsolePrint {
-		writeSyncer = zapcore.NewMultiWriteSyncer(writeSyncer, zapcore.AddSync(os.Stdout))
-		// 同时重定向标准库 log 到文件和控制台
 		global.LogWriter = io.MultiWriter(lumberJackLogger, os.Stdout)
 	} else {
-		// 只重定向到文件
 		global.LogWriter = lumberJackLogger
 	}
 
 	// 重定向标准库 log
 	log.SetOutput(global.LogWriter)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
-	// 重定向 Gin 的默认输出
+	// 重定向 Gin 的默认输出（使用 Gin 原生格式）
 	gin.DefaultWriter = global.LogWriter
 	gin.DefaultErrorWriter = global.LogWriter
 
-	// 创建日志格式化的编码器
-	encoder := getEncoder()
+	// 创建 zap logger（用于结构化日志场景）
+	writeSyncer := zapcore.AddSync(global.LogWriter)
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:      "time",
+		LevelKey:     "level",
+		CallerKey:    "caller",
+		MessageKey:   "msg",
+		LineEnding:   zapcore.DefaultLineEnding,
+		EncodeLevel:  zapcore.CapitalLevelEncoder,
+		EncodeTime:   zapcore.TimeEncoderOfLayout("2006/01/02 15:04:05"),
+		EncodeCaller: zapcore.ShortCallerEncoder,
+	}
+	encoder := zapcore.NewConsoleEncoder(encoderConfig)
 
-	// 根据配置确定日志级别
 	var logLevel zapcore.Level
-
 	if err := logLevel.UnmarshalText([]byte(zapCfg.Level)); err != nil {
 		log.Fatalf("Failed to parse log level: %v", err)
 	}
 
-	// 创建核心和日志实例
 	core := zapcore.NewCore(encoder, writeSyncer, logLevel)
-	logger := zap.New(core, zap.AddCaller())
-	return logger
-}
-
-// getEncoder 返回一个为生产日志配置的 JSON 编码器
-func getEncoder() zapcore.Encoder {
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderConfig.TimeKey = "time"
-	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	encoderConfig.EncodeDuration = zapcore.SecondsDurationEncoder
-	encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
-	return zapcore.NewJSONEncoder(encoderConfig)
+	return zap.New(core, zap.AddCaller())
 }

@@ -25,6 +25,7 @@ const (
 // searchCandidate 搜索候选项（内部使用）
 type searchCandidate struct {
 	Chunk       dbmodel.DocumentChunk
+	DocTitle    string // 文档标题
 	VectorScore float64
 	BM25Score   float64
 	HotScore    float64
@@ -89,14 +90,14 @@ func (s *SearchService) SearchDocuments(req *request.Search) (*response.SearchRe
 	results := make([]response.SearchResultItem, 0, end-start)
 	for _, c := range candidates[start:end] {
 		results = append(results, response.SearchResultItem{
-			ChunkID:     c.Chunk.ID,
-			DocumentID:  c.Chunk.DocumentID,
-			LibraryID:   c.Chunk.LibraryID,
-			Content:     c.Chunk.ChunkText,
-			ChunkType:   c.Chunk.ChunkType,
-			Score:       c.FinalScore,
-			VectorScore: c.VectorScore,
-			BM25Score:   c.BM25Score,
+			ChunkID:    c.Chunk.ID,
+			DocumentID: c.Chunk.DocumentID,
+			LibraryID:  c.Chunk.LibraryID,
+			Title:      extractDeepestTitle(c.Chunk.Metadata),
+			Source:     c.DocTitle,
+			Content:    c.Chunk.ChunkText,
+			Tokens:     c.Chunk.Tokens,
+			Relevance:  c.FinalScore,
 		})
 	}
 
@@ -114,16 +115,21 @@ func (s *SearchService) vectorSearch(ctx context.Context, libraryID uint, queryV
 	var chunks []struct {
 		dbmodel.DocumentChunk
 		Distance float64 `gorm:"column:distance"`
+		DocTitle string  `gorm:"column:doc_title"`
 	}
 
 	query := global.DB.Table("document_chunks").
-		Select("document_chunks.*, embedding <=> ? as distance", pgvector.NewVector(queryVector)).
-		Where("library_id = ? AND status = ?", libraryID, "active").
+		Select("document_chunks.*, documents.title as doc_title, embedding <=> ? as distance", pgvector.NewVector(queryVector)).
+		Joins("LEFT JOIN documents ON documents.id = document_chunks.document_id").
+		Where("document_chunks.library_id = ? AND document_chunks.status = ?", libraryID, "active").
 		Order("distance ASC").
 		Limit(limit)
 
-	if mode != "" {
-		query = query.Where("chunk_type = ?", mode)
+	// mode 过滤：code 搜索 code+mixed，info 搜索 info+mixed
+	if mode == "code" {
+		query = query.Where("document_chunks.chunk_type IN ?", []string{"code", "mixed"})
+	} else if mode == "info" {
+		query = query.Where("document_chunks.chunk_type IN ?", []string{"info", "mixed"})
 	}
 
 	if err := query.Find(&chunks).Error; err != nil {
@@ -139,6 +145,7 @@ func (s *SearchService) vectorSearch(ctx context.Context, libraryID uint, queryV
 		}
 		results[i] = searchCandidate{
 			Chunk:       c.DocumentChunk,
+			DocTitle:    c.DocTitle,
 			VectorScore: similarity,
 		}
 	}
@@ -150,19 +157,24 @@ func (s *SearchService) vectorSearch(ctx context.Context, libraryID uint, queryV
 func (s *SearchService) bm25Search(ctx context.Context, libraryID uint, query string, mode string, limit int) ([]searchCandidate, error) {
 	var chunks []struct {
 		dbmodel.DocumentChunk
-		Rank float64 `gorm:"column:rank"`
+		Rank     float64 `gorm:"column:rank"`
+		DocTitle string  `gorm:"column:doc_title"`
 	}
 
 	// 使用 PostgreSQL 全文搜索
 	sqlQuery := global.DB.Table("document_chunks").
-		Select("document_chunks.*, ts_rank(to_tsvector('simple', chunk_text), plainto_tsquery('simple', ?)) as rank", query).
-		Where("library_id = ? AND status = ?", libraryID, "active").
+		Select("document_chunks.*, documents.title as doc_title, ts_rank(to_tsvector('simple', chunk_text), plainto_tsquery('simple', ?)) as rank", query).
+		Joins("LEFT JOIN documents ON documents.id = document_chunks.document_id").
+		Where("document_chunks.library_id = ? AND document_chunks.status = ?", libraryID, "active").
 		Where("to_tsvector('simple', chunk_text) @@ plainto_tsquery('simple', ?)", query).
 		Order("rank DESC").
 		Limit(limit)
 
-	if mode != "" {
-		sqlQuery = sqlQuery.Where("chunk_type = ?", mode)
+	// mode 过滤：code 搜索 code+mixed，info 搜索 info+mixed
+	if mode == "code" {
+		sqlQuery = sqlQuery.Where("document_chunks.chunk_type IN ?", []string{"code", "mixed"})
+	} else if mode == "info" {
+		sqlQuery = sqlQuery.Where("document_chunks.chunk_type IN ?", []string{"info", "mixed"})
 	}
 
 	if err := sqlQuery.Find(&chunks).Error; err != nil {
@@ -173,6 +185,7 @@ func (s *SearchService) bm25Search(ctx context.Context, libraryID uint, query st
 	for i, c := range chunks {
 		results[i] = searchCandidate{
 			Chunk:     c.DocumentChunk,
+			DocTitle:  c.DocTitle,
 			BM25Score: c.Rank,
 		}
 	}
@@ -245,4 +258,23 @@ func (s *SearchService) mergeAndRerank(vectorResults, bm25Results []searchCandid
 	})
 
 	return candidates
+}
+
+// extractDeepestTitle 从 Metadata 提取最深层级的标题
+func extractDeepestTitle(metadata dbmodel.JSON) string {
+	if metadata == nil {
+		return ""
+	}
+
+	// 从 h6 到 h1 找最深层级的标题
+	for level := 6; level >= 1; level-- {
+		key := fmt.Sprintf("h%d", level)
+		if title, ok := metadata[key]; ok {
+			if titleStr, ok := title.(string); ok && titleStr != "" {
+				return titleStr
+			}
+		}
+	}
+
+	return ""
 }
