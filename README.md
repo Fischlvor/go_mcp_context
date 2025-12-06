@@ -311,6 +311,31 @@ go-mcp-context/
 
 ## 📝 开发日志
 
+### 2025-12-07
+
+#### Added
+- **生产环境部署**
+  - 完成 `mcp.hsk423.cn` 域名部署
+  - Nginx 反向代理配置（HTTP→HTTPS 重定向、SSL、SSE 支持）
+  - Docker 镜像构建与远程部署脚本 (`deploy.sh`)
+  - 服务集成到 `blog-network` 网络，与 `nginx-proxy` 互通
+
+#### Changed
+- **部署脚本优化**
+  - 单服务部署添加 `stop` 步骤，确保配置更新生效
+  - 部署后自动清理 `.tar` 镜像文件
+  - 本地构建后清理悬空镜像 (`docker image prune`)
+  - 创建 `deploy.example.sh` 模板，隐藏敏感信息
+
+- **配置文件安全**
+  - `deploy.sh` 加入 `.gitignore`（包含服务器 IP）
+
+#### Fixed
+- 前端 `VITE_BASE_API` 环境变量未注入 Docker 构建
+- Nginx 配置中 `mcp.hsk423.cn` 重定向问题（浏览器缓存）
+
+---
+
 ### 2025-12-06
 
 #### Added
