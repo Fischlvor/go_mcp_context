@@ -2,9 +2,7 @@ package initialize
 
 import (
 	"fmt"
-	"log"
 	"os"
-	"time"
 
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/pkg/global"
@@ -18,19 +16,8 @@ import (
 func InitGorm() *gorm.DB {
 	pgCfg := global.Config.Postgres
 
-	// 创建自定义 GORM logger，输出到日志文件
-	gormLogger := logger.New(
-		log.New(global.LogWriter, "\r\n", log.LstdFlags),
-		logger.Config{
-			SlowThreshold:             time.Second,
-			LogLevel:                  pgCfg.LogLevel(),
-			IgnoreRecordNotFoundError: true,
-			Colorful:                  false,
-		},
-	)
-
 	db, err := gorm.Open(postgres.Open(pgCfg.Dsn()), &gorm.Config{
-		Logger: gormLogger,
+		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		fmt.Printf("Failed to connect to PostgreSQL: %v\n", err)

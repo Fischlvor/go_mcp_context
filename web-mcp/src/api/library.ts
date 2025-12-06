@@ -7,8 +7,9 @@ export interface Library {
   version: string
   description: string
   status: string
-  document_count?: number
-  chunk_count?: number
+  document_count: number
+  chunk_count: number
+  token_count: number
   created_at: string
   updated_at: string
 }

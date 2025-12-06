@@ -1,5 +1,7 @@
 <template>
   <header class="left-0 right-0 top-0 z-40">
+    <!-- 顶部渐变背景 -->
+    <div class="absolute inset-x-0 top-0 h-[260px] bg-gradient-to-b from-emerald-500/[0.15] to-transparent -z-10 pointer-events-none"></div>
     <div class="mx-auto flex w-full max-w-[880px] flex-col items-start justify-between border-b border-stone-200 px-4 md:h-[88px] md:flex-row md:items-center lg:px-0">
       <!-- 左侧 -->
       <div class="flex w-full items-center justify-between py-4 md:w-auto md:py-0">
@@ -44,10 +46,16 @@
         <span class="hidden h-4 w-px bg-stone-400 md:block"></span>
         <span class="hidden text-base text-stone-500 underline underline-offset-2 md:block">Install</span>
         
-        <!-- Add Docs 按钮（始终显示在右侧） -->
+        <!-- Add Docs 按钮 -->
         <button 
-          class="hidden h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-base font-normal leading-none text-white transition-colors hover:bg-emerald-700 md:inline-flex md:whitespace-nowrap"
-          @click="$emit('add-docs')"
+          :disabled="!isLoggedIn"
+          :class="[
+            'hidden h-10 items-center justify-center gap-2 rounded-lg px-3 text-base font-normal leading-none transition-colors md:inline-flex md:whitespace-nowrap',
+            isLoggedIn 
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer' 
+              : 'bg-stone-300 text-stone-500 cursor-not-allowed'
+          ]"
+          @click="isLoggedIn && $emit('add-docs')"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 5l0 14"></path>

@@ -106,6 +106,9 @@ func SSOJWTAuth() gin.HandlerFunc {
 				c.Header("X-New-Access-Token", newToken.AccessToken)
 				c.Header("X-Token-Expires-In", strconv.Itoa(newToken.ExpiresIn))
 
+				// 替换请求头中的 Authorization，供后续 handler 使用
+				c.Request.Header.Set("Authorization", "Bearer "+newToken.AccessToken)
+
 				// 重新解析新 token
 				claims, err = ParseSSOAccessToken(newToken.AccessToken)
 				if err != nil {

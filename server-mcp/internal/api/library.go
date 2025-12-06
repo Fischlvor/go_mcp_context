@@ -13,7 +13,7 @@ import (
 
 type LibraryApi struct{}
 
-// List 获取库列表
+// List 获取库列表（带统计信息）
 func (l *LibraryApi) List(c *gin.Context) {
 	var req request.LibraryList
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -21,7 +21,7 @@ func (l *LibraryApi) List(c *gin.Context) {
 		return
 	}
 
-	result, err := libraryService.List(&req)
+	result, err := libraryService.ListWithStats(&req)
 	if err != nil {
 		response.FailWithMessage("查询失败: "+err.Error(), c)
 		return
@@ -47,7 +47,7 @@ func (l *LibraryApi) Create(c *gin.Context) {
 	response.OkWithData(library, c)
 }
 
-// Get 获取库详情
+// Get 获取库详情（带统计信息）
 func (l *LibraryApi) Get(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -55,7 +55,7 @@ func (l *LibraryApi) Get(c *gin.Context) {
 		return
 	}
 
-	library, err := libraryService.GetByID(uint(id))
+	library, err := libraryService.GetLibraryInfo(uint(id))
 	if err != nil {
 		response.FailWithMessage("库不存在", c)
 		return

@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import request from '@/utils/request'
+import { accessToken, setAccessToken, clearAccessToken, initAccessToken } from '@/utils/token'
 
 // 用户信息接口
 export interface User {
@@ -8,10 +9,8 @@ export interface User {
   team?: string
 }
 
-// 用户状态（简单的响应式状态管理）
-// 默认未登录状态
+// 用户状态
 const user = ref<User | null>(null)
-const accessToken = ref<string | null>(null)
 
 // 是否已登录
 export const isLoggedIn = computed(() => user.value !== null && accessToken.value !== null)
@@ -35,8 +34,7 @@ export const getAccessToken = computed(() => accessToken.value)
 export function login(userData: User, token?: string) {
   user.value = userData
   if (token) {
-    accessToken.value = token
-    localStorage.setItem('access_token', token)
+    setAccessToken(token)
   }
   localStorage.setItem('user', JSON.stringify(userData))
 }
@@ -51,17 +49,15 @@ export async function logout() {
   }
   
   user.value = null
-  accessToken.value = null
+  clearAccessToken()
   localStorage.removeItem('user')
-  localStorage.removeItem('access_token')
 }
 
 // 初始化：从 localStorage 恢复用户状态，并从 SSO 获取最新用户信息
 export async function initUserState() {
-  const savedToken = localStorage.getItem('access_token')
+  initAccessToken()
   
-  if (savedToken) {
-    accessToken.value = savedToken
+  if (accessToken.value) {
     // 从 SSO 获取最新用户信息
     await fetchUserInfo()
   }
@@ -85,9 +81,8 @@ export async function fetchUserInfo() {
       // token 无效，清除登录状态
       console.error('获取用户信息失败:', res.msg)
       user.value = null
-      accessToken.value = null
+      clearAccessToken()
       localStorage.removeItem('user')
-      localStorage.removeItem('access_token')
     }
   } catch (e) {
     console.error('获取用户信息失败:', e)
