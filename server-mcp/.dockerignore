@@ -1,0 +1,44 @@
+# Dependencies
+vendor/
+
+# Build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+server
+
+# Test files
+*_test.go
+*.test
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Logs
+log/
+logs/
+*.log
+
+# Uploads (runtime data)
+uploads/
+
+# Keys (will be mounted)
+keys/
+
+# Temp files
+tmp/
+*.tmp
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
