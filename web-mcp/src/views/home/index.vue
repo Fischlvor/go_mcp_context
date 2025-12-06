@@ -1,10 +1,5 @@
 <template>
-  <div class="relative flex min-h-screen flex-col overflow-x-hidden bg-transparent antialiased">
-    <!-- 顶部渐变背景 -->
-    <div class="absolute inset-x-0 top-0 h-[260px] bg-gradient-to-b from-emerald-500/[0.15] to-transparent"></div>
-    <!-- 底层背景色 -->
-    <div class="fixed inset-0 -z-10 bg-stone-50"></div>
-
+  <div class="relative flex min-h-screen flex-col overflow-x-hidden bg-stone-50 antialiased">
     <!-- 顶部 Header -->
     <AppHeader 
       :is-logged-in="isLoggedIn" 
@@ -15,138 +10,137 @@
     />
     
     <!-- 主内容区 -->
-    <main class="flex-grow pt-0">
-      <div class="relative overflow-y-auto overflow-x-hidden pb-0">
-        <div class="flex flex-col gap-4 px-4 pt-10 md:gap-[19px] md:pt-20">
-          <!-- Hero Section -->
-          <div class="mx-auto flex w-full max-w-[880px] flex-col gap-1">
-            <h1 class="text-left text-lg font-semibold leading-[1.4] tracking-tight sm:text-xl md:text-2xl">
-              <span class="text-emerald-600">Up-to-date Docs</span><br>
-              <span class="text-stone-700">for LLMs and AI code editors</span>
-            </h1>
-            <p class="text-left text-sm text-stone-500 sm:text-base md:text-lg">
-              Copy latest <span class="text-emerald-600">docs</span> &amp; <span class="text-emerald-600">code</span> — paste into <span class="text-emerald-600">Cursor</span>, <span class="text-emerald-600">Claude</span>, or other LLMs
-            </p>
-          </div>
+    <main class="flex flex-col gap-4 px-4 pt-10 sm:px-6 md:gap-[19px] md:pt-20">
+      <!-- 1. Hero Section -->
+      <div class="mx-auto flex w-full max-w-[880px] flex-col gap-1">
+        <h1 class="text-left text-lg font-semibold leading-[1.4] tracking-tight sm:text-xl md:text-2xl">
+          <span class="text-emerald-600">Up-to-date Docs</span><br>
+          <span class="text-stone-700">for LLMs and AI code editors</span>
+        </h1>
+        <p class="text-left text-sm text-stone-500 sm:text-base md:text-lg">
+          Copy latest docs &amp; code — paste into Cursor, Claude, or other LLMs
+        </p>
+      </div>
 
-          <!-- 搜索区域 -->
-          <div class="mx-auto w-full max-w-[880px]">
-            <div class="flex flex-col items-center gap-3 md:flex-row md:gap-4">
-              <div class="relative w-full md:w-[460px]">
-                <input
-                  v-model="searchQuery"
-                  type="text"
-                  class="h-11 w-full rounded-xl border border-stone-400 bg-white px-4 pr-10 text-sm text-stone-800 shadow-md placeholder:text-stone-400 focus-within:ring-1 focus-within:ring-emerald-600 hover:border-emerald-600 focus:border-emerald-600 focus:outline-none sm:text-base md:h-[50px]"
-                  placeholder="Search a library (e.g. Next, React)"
-                  @input="handleSearch"
-                />
-              </div>
-              <span class="text-sm font-normal text-stone-400">or</span>
-              <a class="flex h-11 w-full items-center justify-center rounded-xl border border-stone-400 bg-white px-4 text-sm text-stone-600 shadow-md transition-colors hover:border-emerald-600 hover:text-emerald-600 focus:border-emerald-600 sm:text-base md:h-[50px] md:w-auto" href="#">Chat with Docs</a>
+      <!-- 2. 搜索区域 -->
+      <div class="mx-auto w-full max-w-[880px]">
+        <div class="flex flex-col items-center gap-3 md:flex-row md:gap-4">
+          <div class="relative w-full md:w-[460px]">
+            <input
+              v-model="searchQuery"
+              type="text"
+              aria-label="Search for a library"
+              class="h-11 w-full rounded-xl border border-stone-400 bg-white px-4 pr-10 text-sm text-stone-800 shadow-md placeholder:text-stone-400 focus-within:ring-1 focus-within:ring-emerald-600 hover:border-emerald-600 focus:border-emerald-600 focus:outline-none sm:text-base md:h-[50px]"
+              placeholder="Search a library (e.g. Next, React)"
+              @input="handleSearch"
+            />
+          </div>
+          <span class="text-sm font-normal text-stone-400">or</span>
+          <a class="flex h-11 w-full items-center justify-center rounded-xl border border-stone-400 bg-white px-4 text-sm text-stone-600 shadow-md transition-colors hover:border-emerald-600 hover:text-emerald-600 focus:border-emerald-600 sm:text-base md:h-[50px] md:w-auto" href="#">Chat with Docs</a>
+        </div>
+      </div>
+
+      <!-- 3. 表格区域（Tabs + Table + 底部栏） -->
+      <div>
+        <!-- Tabs -->
+        <div class="mx-auto mt-8 w-full max-w-[880px] md:mt-12">
+          <div class="relative flex w-full items-end gap-0">
+            <button 
+              v-for="tab in tabs" 
+              :key="tab.id"
+              :class="['flex items-center font-medium gap-1 px-2 py-1.5 text-sm sm:gap-2 sm:px-4 sm:py-2 sm:text-base', activeTab === tab.id ? 'rounded-t-lg border border-stone-300 border-b-transparent text-stone-800' : 'border border-stone-300 border-l-transparent border-r-transparent border-t-transparent text-stone-500 hover:text-stone-600']"
+              @click="activeTab = tab.id"
+            >
+              <svg v-if="tab.id === 'popular'" class="h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"></path>
+              </svg>
+              <svg v-else-if="tab.id === 'trending'" class="h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 17l6 -6l4 4l8 -8"></path>
+                <path d="M14 7l7 0l0 7"></path>
+              </svg>
+              <svg v-else class="h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
+                <path d="M12 7v5l3 3"></path>
+              </svg>
+              {{ tab.label }}
+            </button>
+            <div class="flex-grow border-b border-stone-300"></div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="flex justify-center overflow-x-auto">
+          <div class="w-full max-w-[880px]">
+            <div class="h-full min-w-[280px] sm:min-w-[600px]">
+              <table class="w-full table-fixed border-b border-stone-200">
+                <thead class="top-0 z-10 border-b border-stone-200">
+                  <tr>
+                    <th class="w-auto px-2 py-3 sm:w-[150px] sm:px-4"></th>
+                    <th class="hidden w-[230px] px-2 py-3 text-left text-sm font-normal uppercase leading-none text-stone-400 sm:table-cell sm:px-4">SOURCE</th>
+                    <th class="hidden w-[80px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:table-cell sm:px-4">TOKENS</th>
+                    <th class="w-[80px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:w-[100px] sm:px-4">SNIPPETS</th>
+                    <th class="hidden w-[115px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:table-cell sm:px-4">UPDATE</th>
+                    <th class="hidden w-[30px] px-1 py-3 text-center text-sm font-normal uppercase leading-none text-stone-400 sm:table-cell"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-stone-200">
+                  <tr v-if="libraries.length === 0 && !loading">
+                    <td colspan="6" class="py-16 text-center">
+                      <div class="flex flex-col items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-stone-300">
+                          <rect width="16" height="20" x="4" y="2" rx="2" ry="2"></rect>
+                          <path d="M9 22v-4h6v4"></path>
+                          <path d="M8 6h.01"></path>
+                          <path d="M16 6h.01"></path>
+                          <path d="M12 6h.01"></path>
+                        </svg>
+                        <p class="text-sm font-medium text-stone-500">No libraries yet</p>
+                        <p class="text-sm text-stone-400">Add your first library to get started</p>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr 
+                    v-for="lib in libraries" 
+                    :key="lib.id" 
+                    class="group cursor-pointer transition-colors hover:bg-white"
+                    @click="goToLibrary(lib.id)"
+                  >
+                    <td class="h-11 px-2 align-middle sm:px-4">
+                      <a :title="lib.name" class="block max-w-[auto] truncate text-base font-semibold leading-tight text-emerald-600 hover:text-emerald-500 hover:underline">{{ lib.name }}</a>
+                    </td>
+                    <td class="hidden h-11 px-2 text-left align-middle text-base font-normal slashed-zero tabular-nums text-stone-800 sm:table-cell sm:px-4 sm:leading-tight">
+                      <div class="flex flex-row items-center gap-2">
+                        <span class="inline-flex flex-shrink-0 items-center justify-center" style="width: 20px; height: 20px;">
+                          <svg role="img" viewBox="0 0 16 16" width="18" height="18" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0">
+                            <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68.003 1.36.092 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+                          </svg>
+                        </span>
+                        <span class="truncate text-stone-800 hover:text-stone-600">/{{ lib.name.toLowerCase().replace(/\s+/g, '-') }}/{{ lib.version || 'docs' }}</span>
+                      </div>
+                    </td>
+                    <td class="hidden h-11 px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:table-cell sm:px-4 sm:leading-none">{{ formatNumber(lib.token_count || 0) }}</td>
+                    <td class="h-11 px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4 sm:leading-none">{{ formatNumber(lib.chunk_count || 0) }}</td>
+                    <td class="hidden h-11 px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:table-cell sm:px-4 sm:leading-none">{{ formatDate(lib.updated_at) }}</td>
+                    <td class="hidden h-11 px-1 text-center align-middle sm:table-cell">
+                      <div class="flex items-center justify-center">
+                        <div class="relative inline-flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 cursor-pointer text-emerald-600">
+                            <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
+                            <path d="M9 12l2 2l4 -4"></path>
+                          </svg>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
+        </div>
 
-          <!-- Tabs + 表格区域 -->
-          <div class="mx-auto mt-8 w-full max-w-[880px] md:mt-12">
-            <!-- Tabs -->
-            <div class="relative flex w-full items-end gap-0">
-              <button 
-                v-for="tab in tabs" 
-                :key="tab.id"
-                :class="['flex items-center font-medium gap-1 px-2 py-1.5 text-sm sm:gap-2 sm:px-4 sm:py-2 sm:text-base', activeTab === tab.id ? 'rounded-t-lg border border-stone-300 border-b-transparent text-stone-800' : 'border border-stone-300 border-l-transparent border-r-transparent border-t-transparent text-stone-500 hover:text-stone-600']"
-                @click="activeTab = tab.id"
-              >
-                <svg v-if="tab.id === 'popular'" class="h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"></path>
-                </svg>
-                <svg v-else-if="tab.id === 'trending'" class="h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 17l6 -6l4 4l8 -8"></path>
-                  <path d="M14 7l7 0l0 7"></path>
-                </svg>
-                <svg v-else class="h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
-                  <path d="M12 7v5l3 3"></path>
-                </svg>
-                {{ tab.label }}
-              </button>
-              <div class="flex-grow border-b border-stone-300"></div>
-            </div>
-          </div>
-
-          <!-- 表格 -->
-          <div class="flex justify-center overflow-x-auto">
-            <div class="w-full max-w-[880px]">
-              <div class="h-full min-w-[280px] sm:min-w-[600px]">
-                <div class="table-container">
-          <table class="library-table">
-            <thead>
-              <tr>
-                <th class="col-name"></th>
-                <th class="col-source">SOURCE</th>
-                <th class="col-tokens">TOKENS</th>
-                <th class="col-snippets">SNIPPETS</th>
-                <th class="col-update">UPDATE</th>
-                <th class="col-action"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="libraries.length === 0 && !loading">
-                <td colspan="6" class="empty-state">
-                  <div class="empty-content">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
-                      <rect width="16" height="20" x="4" y="2" rx="2" ry="2"></rect>
-                      <path d="M9 22v-4h6v4"></path>
-                      <path d="M8 6h.01"></path>
-                      <path d="M16 6h.01"></path>
-                      <path d="M12 6h.01"></path>
-                      <path d="M12 10h.01"></path>
-                      <path d="M12 14h.01"></path>
-                      <path d="M16 10h.01"></path>
-                      <path d="M16 14h.01"></path>
-                      <path d="M8 10h.01"></path>
-                      <path d="M8 14h.01"></path>
-                    </svg>
-                    <p class="empty-text">No libraries yet</p>
-                    <p class="empty-hint">Add your first library to get started</p>
-                  </div>
-                </td>
-              </tr>
-              <tr 
-                v-for="lib in libraries" 
-                :key="lib.id" 
-                class="table-row"
-                @click="goToLibrary(lib.id)"
-              >
-                <td class="col-name">
-                  <span class="lib-name">{{ lib.name }}</span>
-                </td>
-                <td class="col-source">
-                  <div class="source-info">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="source-icon">
-                      <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path>
-                      <path d="M9 18c-4.51 2-5-2-7-2"></path>
-                    </svg>
-                    <span class="source-text">/{{ lib.name.toLowerCase().replace(/\s+/g, '-') }}/{{ lib.version || 'docs' }}</span>
-                  </div>
-                </td>
-                <td class="col-tokens">{{ formatNumber(lib.chunk_count || 0) }}</td>
-                <td class="col-snippets">{{ formatNumber(lib.document_count || 0) }}</td>
-                <td class="col-update">{{ formatDate(lib.updated_at) }}</td>
-                <td class="col-action">
-                  <button class="arrow-btn" @click.stop="goToLibrary(lib.id)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <path d="m10 8 4 4-4 4"></path>
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-                </div>
-              </div>
-            </div>
-          </div>
+        <!-- 底部统计栏 -->
+        <div class="mx-auto flex w-full max-w-[880px] items-center justify-between bg-stone-100 px-4 py-3 md:px-4">
+          <span class="text-sm font-normal uppercase text-stone-400">{{ total }} Libraries</span>
         </div>
       </div>
     </main>
@@ -197,9 +191,9 @@ import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
-// TODO: 替换为 shadcn-vue 的 toast 组件
+
 const ElMessage = {
-  success: (msg: string) => alert(msg),
+  success: (msg: string) => console.log('✓', msg),
   warning: (msg: string) => alert(msg),
   error: (msg: string) => alert(msg),
 }
@@ -358,7 +352,7 @@ const closeDropdown = (e: MouseEvent) => {
 }
 
 const goToLibrary = (id: number) => {
-  router.push(`/libraries/${id}/documents`)
+  router.push(`/libraries/${id}`)
 }
 
 const formatNumber = (num: number) => {
@@ -393,169 +387,5 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* ========== 表格样式 (保留，因为表格内容复杂) ========== */
-
-.table-container {
-  overflow-x: auto;
-}
-
-.library-table {
-  width: 100%;
-  min-width: 600px;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.library-table thead tr {
-  border-bottom: 1px solid #e7e5e4;
-}
-
-.library-table th {
-  padding: 10px 16px;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  color: #a8a29e;
-  text-align: left;
-  letter-spacing: 0.3px;
-}
-
-.library-table th.col-name {
-  width: 120px;
-}
-
-.library-table th.col-source {
-  width: auto;
-}
-
-.library-table th.col-tokens,
-.library-table th.col-snippets {
-  width: 80px;
-  text-align: right;
-}
-
-.library-table th.col-update {
-  width: 80px;
-  text-align: right;
-}
-
-.library-table th.col-action {
-  width: 36px;
-  text-align: center;
-}
-
-.library-table tbody tr {
-  transition: background-color 0.15s;
-  border-bottom: 1px solid #f5f5f4;
-}
-
-.library-table tbody tr:last-child {
-  border-bottom: none;
-}
-
-.library-table tbody tr:hover {
-  background: #fafaf9;
-}
-
-.library-table tbody tr.table-row {
-  cursor: pointer;
-}
-
-.library-table td {
-  padding: 12px 16px;
-  font-size: 14px;
-  color: #1c1917;
-  vertical-align: middle;
-}
-
-.library-table td.col-tokens,
-.library-table td.col-snippets,
-.library-table td.col-update {
-  text-align: right;
-  color: #78716c;
-  font-size: 14px;
-}
-
-.lib-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #059669;
-  transition: text-decoration 0.15s;
-}
-
-.lib-name:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.source-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.source-icon {
-  flex-shrink: 0;
-  color: #78716c;
-}
-
-.source-text {
-  color: #57534e;
-  font-size: 14px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-/* ========== 箭头按钮 ========== */
-.arrow-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: #059669;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.arrow-btn:hover {
-  background: #ecfdf5;
-}
-
-
-/* ========== 空状态 ========== */
-.empty-state {
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.empty-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.empty-icon {
-  color: #d6d3d1;
-  margin-bottom: 12px;
-  width: 48px;
-  height: 48px;
-}
-
-.empty-text {
-  font-size: 14px;
-  font-weight: 500;
-  color: #57534e;
-  margin: 0;
-}
-
-.empty-hint {
-  font-size: 13px;
-  color: #a8a29e;
-  margin: 0;
-}
-
+/* 页面无需额外样式，全部使用 Tailwind CSS */
 </style>

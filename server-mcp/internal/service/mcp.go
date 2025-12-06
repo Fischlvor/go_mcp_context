@@ -115,9 +115,11 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 		documents := make([]response.MCPDocumentChunk, 0, len(searchResult.Results))
 		for _, r := range searchResult.Results {
 			documents = append(documents, response.MCPDocumentChunk{
+				Title:     r.Title,
+				Source:    r.Source,
 				Content:   r.Content,
-				ChunkType: r.ChunkType,
-				Score:     r.Score,
+				Tokens:    r.Tokens,
+				Relevance: r.Relevance,
 			})
 		}
 
@@ -138,9 +140,11 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 	documents := make([]response.MCPDocumentChunk, 0, len(chunks))
 	for _, chunk := range chunks {
 		documents = append(documents, response.MCPDocumentChunk{
+			Title:     extractDeepestTitle(chunk.Metadata),
+			Source:    "", // 无搜索时暂不获取文档标题
 			Content:   chunk.ChunkText,
-			ChunkType: chunk.ChunkType,
-			Score:     1.0, // 无搜索时默认分数
+			Tokens:    chunk.Tokens,
+			Relevance: 1.0, // 无搜索时默认分数
 		})
 	}
 

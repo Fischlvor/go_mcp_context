@@ -14,10 +14,22 @@ const routes = [
     meta: { title: 'Dashboard' }
   },
   {
-    path: '/libraries/:id/documents',
-    name: 'documents',
-    component: () => import('@/views/document/index.vue'),
-    meta: { title: '文档管理' }
+    path: '/libraries/:id',
+    name: 'library-detail',
+    component: () => import('@/views/library/detail.vue'),
+    meta: { title: 'Library Detail' }
+  },
+  {
+    path: '/libraries/:id/admin',
+    name: 'library-admin',
+    component: () => import('@/views/library/admin.vue'),
+    meta: { title: 'Library Admin' }
+  },
+  {
+    path: '/libraries/:id/:title',
+    name: 'library-document',
+    component: () => import('@/views/library/detail.vue'),
+    meta: { title: 'Document' }
   },
   {
     path: '/search',

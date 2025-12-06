@@ -2,6 +2,7 @@ package embedding
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -17,6 +18,12 @@ type OpenAIProxyEmbedding struct {
 func NewOpenAIProxyEmbedding(apiKey string, baseURL string, model string, dimension int) *OpenAIProxyEmbedding {
 	config := openai.DefaultConfig(apiKey)
 	config.BaseURL = baseURL
+	// 不走系统代理，直连
+	config.HTTPClient = &http.Client{
+		Transport: &http.Transport{
+			Proxy: nil,
+		},
+	}
 	client := openai.NewClientWithConfig(config)
 
 	var embeddingModel openai.EmbeddingModel
