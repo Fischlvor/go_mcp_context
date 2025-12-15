@@ -14,7 +14,7 @@
       <el-table :data="libraries" v-loading="loading" style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="名称" />
-        <el-table-column prop="version" label="版本" width="120" />
+        <el-table-column prop="default_version" label="默认版本" width="120" />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -63,9 +63,6 @@
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入库名称" />
         </el-form-item>
-        <el-form-item label="版本" prop="version">
-          <el-input v-model="form.version" placeholder="请输入版本号，如 1.0.0" />
-        </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input
             v-model="form.description"
@@ -89,14 +86,14 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getLibraries, createLibrary, updateLibrary, deleteLibrary } from '@/api/library'
-import type { Library } from '@/api/library'
+import type { LibraryListItem } from '@/api/library'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
 
 const loading = ref(false)
-const libraries = ref<Library[]>([])
+const libraries = ref<LibraryListItem[]>([])
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -109,13 +106,11 @@ const formRef = ref<FormInstance>()
 
 const form = reactive({
   name: '',
-  version: '',
   description: ''
 })
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入库名称', trigger: 'blur' }],
-  version: [{ required: true, message: '请输入版本号', trigger: 'blur' }]
+  name: [{ required: true, message: '请输入库名称', trigger: 'blur' }]
 }
 
 const fetchLibraries = async () => {
@@ -138,17 +133,15 @@ const showCreateDialog = () => {
   isEdit.value = false
   editId.value = null
   form.name = ''
-  form.version = ''
   form.description = ''
   dialogVisible.value = true
 }
 
-const showEditDialog = (row: Library) => {
+const showEditDialog = (row: LibraryListItem) => {
   isEdit.value = true
   editId.value = row.id
   form.name = row.name
-  form.version = row.version
-  form.description = row.description
+  form.description = ''  // 列表项没有 description，需要从详情获取
   dialogVisible.value = true
 }
 

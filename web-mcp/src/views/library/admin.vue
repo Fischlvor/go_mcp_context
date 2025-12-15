@@ -34,7 +34,7 @@
           <div class="mt-10">
             <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div class="overflow-x-auto overflow-y-hidden sm:overflow-visible">
-                <div class="relative flex flex-nowrap items-end gap-1">
+                <div class="relative flex flex-nowrap items-end gap-1 border-b border-stone-300">
                   <button 
                     :class="[
                       '-mb-px flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-base font-medium',
@@ -50,6 +50,21 @@
                       <path d="M14 4l-4 16"></path>
                     </svg>
                     Configuration
+                  </button>
+                  <button 
+                    :class="[
+                      '-mb-px flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-base font-medium',
+                      activeTab === 'versions' 
+                        ? 'relative z-10 border border-stone-300 border-b-stone-50 bg-stone-50 text-stone-800' 
+                        : 'border border-stone-300 border-b-transparent text-stone-500 hover:border-stone-400 hover:text-stone-600'
+                    ]"
+                    @click="activeTab = 'versions'"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path>
+                      <path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3z"></path>
+                    </svg>
+                    Versions
                   </button>
                   <button 
                     :class="[
@@ -82,61 +97,174 @@
                   </svg>
                   <span>Refresh</span>
                 </button>
+                <button 
+                  class="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-red-300 text-base text-red-600 transition hover:border-red-400 hover:bg-red-50 px-3 py-2"
+                  @click="handleDeleteLibrary"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-red-600">
+                    <path d="M4 7l16 0"></path>
+                    <path d="M10 11l0 6"></path>
+                    <path d="M14 11l0 6"></path>
+                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
+                    <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
+                  </svg>
+                  <span>Delete Library</span>
+                </button>
               </div>
             </div>
-            <div class="border-t border-stone-300"></div>
           </div>
 
           <!-- Configuration Tab -->
           <div v-if="activeTab === 'configuration'" class="mt-8">
             <div class="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
-              <div class="space-y-6">
-                <h3 class="text-lg font-semibold text-stone-800">Library Information</h3>
+              <form class="space-y-6">
+                <div class="flex items-center justify-between gap-4">
+                  <h3 class="text-base font-semibold text-stone-800">Basic Information</h3>
+                </div>
                 
-                <div class="space-y-4">
-                  <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-2">Name</label>
-                    <input 
-                      v-model="editForm.name"
-                      type="text" 
-                      class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
-                      placeholder="Library name"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-2">Version</label>
-                    <input 
-                      v-model="editForm.version"
-                      type="text" 
-                      class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
-                      placeholder="e.g. 3.4.0"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-2">Description</label>
-                    <textarea 
-                      v-model="editForm.description"
-                      rows="3" 
-                      class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm resize-none focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
-                      placeholder="Brief description of the library"
-                    ></textarea>
+                <div class="-mt-2">
+                  <div class="space-y-4">
+                    <div>
+                      <label class="block text-sm font-medium text-stone-700 mb-2">Name</label>
+                      <input 
+                        v-model="editForm.name"
+                        type="text" 
+                        class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 bg-white hover:border-emerald-600"
+                        placeholder="Library name"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-stone-700 mb-2">Description</label>
+                      <textarea 
+                        v-model="editForm.description"
+                        rows="3" 
+                        class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm resize-none focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 bg-white hover:border-emerald-600"
+                        placeholder="Brief description of the library"
+                      ></textarea>
+                    </div>
                   </div>
                 </div>
 
-                <div class="flex justify-end gap-3 pt-4 border-t border-stone-200">
+                <div class="border-t border-stone-200 pt-6">
+                  <div class="flex items-center gap-4">
+                    <button 
+                      type="button"
+                      class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="saving"
+                      @click="saveConfiguration"
+                    >
+                      {{ saving ? 'Saving...' : 'Save Configuration' }}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Versions Tab -->
+          <div v-if="activeTab === 'versions'" class="mt-8">
+            <div class="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+              <div class="space-y-6">
+                <!-- 标题和添加版本按钮 -->
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-base font-semibold text-stone-800">Versions</h3>
+                    <p class="mt-1 text-sm text-stone-500">Manage different versions and tags of this library</p>
+                  </div>
                   <button 
-                    class="h-10 px-4 rounded-lg border border-stone-300 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                    @click="resetForm"
+                    class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-all bg-emerald-600 text-white hover:bg-emerald-700"
+                    title="Add a new version"
+                    @click="showAddVersionModal = true"
                   >
-                    Reset
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+                      <path d="M12 5l0 14"></path>
+                      <path d="M5 12l14 0"></path>
+                    </svg>
+                    Add Version
                   </button>
-                  <button 
-                    class="h-10 px-4 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                    :disabled="saving"
-                    @click="saveConfiguration"
-                  >
-                    {{ saving ? 'Saving...' : 'Save Changes' }}
-                  </button>
+                </div>
+
+                <!-- 版本列表表格 -->
+                <div class="w-full overflow-x-auto md:overflow-x-visible">
+                  <table class="w-full min-w-[600px] table-fixed border-b border-stone-200">
+                    <thead class="border-b border-stone-200">
+                      <tr>
+                        <th class="w-[200px] px-2 py-3 text-left text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Version</th>
+                        <th class="w-[120px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Tokens</th>
+                        <th class="w-[120px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Snippets</th>
+                        <th class="w-[160px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Last Updated</th>
+                        <th class="w-[100px] px-1 py-3 text-center text-sm font-normal uppercase leading-none text-stone-400">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-200">
+                      <!-- 空状态 -->
+                      <tr v-if="versions.length === 0 && !loadingVersions">
+                        <td colspan="5" class="py-12 text-center">
+                          <div class="flex flex-col items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-stone-300">
+                              <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path>
+                              <path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3z"></path>
+                            </svg>
+                            <p class="text-sm font-medium text-stone-500">No versions yet</p>
+                            <p class="text-sm text-stone-400">Create your first version to get started</p>
+                          </div>
+                        </td>
+                      </tr>
+                      <!-- 版本行 -->
+                      <tr v-for="version in versions" :key="version.version" class="group transition-colors hover:bg-white">
+                        <td class="h-11 px-2 align-middle sm:px-4">
+                          <div class="flex items-center gap-2 text-base font-normal leading-tight text-stone-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0">
+                              <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path>
+                              <path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3z"></path>
+                            </svg>
+                            <span class="transition-colors hover:text-emerald-600">{{ version.version }}</span>
+                            <span v-if="version.version === library.default_version" class="ml-1 rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-semibold text-white">Default</span>
+                          </div>
+                        </td>
+                        <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatNumber(version.token_count || 0) }}
+                        </td>
+                        <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatNumber(version.chunk_count || 0) }}
+                        </td>
+                        <td class="h-11 px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatDateShort(version.last_updated) }}
+                        </td>
+                        <td class="h-11 px-1 text-center align-middle">
+                          <div class="flex items-center justify-center gap-2">
+                            <!-- 刷新按钮 -->
+                            <button 
+                              class="flex items-center justify-center text-stone-500 transition-colors hover:text-emerald-600 disabled:opacity-50"
+                              title="Refresh version"
+                              :disabled="version.version === library.default_version"
+                              @click="handleRefreshVersion(version.version)"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path>
+                                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path>
+                              </svg>
+                            </button>
+                            <!-- 删除按钮 -->
+                            <button 
+                              class="flex items-center justify-center text-stone-300 transition-colors hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Delete version"
+                              :disabled="version.version === library.default_version"
+                              @click="handleDeleteVersion(version.version)"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 7l16 0"></path>
+                                <path d="M10 11l0 6"></path>
+                                <path d="M14 11l0 6"></path>
+                                <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
+                                <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -150,32 +278,47 @@
                 <div class="flex items-center justify-between">
                   <div>
                     <h3 class="text-base font-semibold text-stone-800">Documents</h3>
-                    <p class="mt-1 text-sm text-stone-500">Manage documents in this library</p>
+                    <p class="mt-1 text-sm text-stone-500">Upload documents to a specific version</p>
                   </div>
-                  <label 
-                    :class="[
-                      'flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-white transition-colors',
-                      uploading ? 'bg-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer'
-                    ]"
-                  >
-                    <svg v-if="!uploading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path>
-                      <path d="M7 9l5 -5l5 5"></path>
-                      <path d="M12 4l0 12"></path>
-                    </svg>
-                    <svg v-else class="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    {{ uploading ? 'Processing...' : 'Upload' }}
-                    <input 
-                      type="file" 
-                      class="hidden" 
-                      accept=".md,.pdf,.docx"
-                      :disabled="uploading"
-                      @change="handleFileUpload"
-                    />
-                  </label>
+                  <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- 版本选择下拉框 -->
+                    <select 
+                      v-model="selectedVersion"
+                      class="h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 bg-white hover:border-emerald-600"
+                      :disabled="uploading || versions.length === 0"
+                    >
+                      <option value="">Select version...</option>
+                      <option v-for="version in versions" :key="version.version" :value="version.version">
+                        {{ version.version }} ({{ formatNumber(version.token_count) }} tokens)
+                      </option>
+                    </select>
+                    <!-- 上传按钮 -->
+                    <label 
+                      :class="[
+                        'flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-white transition-colors whitespace-nowrap',
+                        uploading || !selectedVersion ? 'bg-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer'
+                      ]"
+                    >
+                      <svg v-if="!uploading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path>
+                        <path d="M7 9l5 -5l5 5"></path>
+                        <path d="M12 4l0 12"></path>
+                      </svg>
+                      <svg v-else class="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span class="hidden sm:inline">{{ uploading ? 'Processing...' : 'Upload' }}</span>
+                      <span class="sm:hidden">{{ uploading ? '...' : 'Upload' }}</span>
+                      <input 
+                        type="file" 
+                        class="hidden" 
+                        accept=".md,.pdf,.docx"
+                        :disabled="uploading || !selectedVersion"
+                        @change="handleFileUpload"
+                      />
+                    </label>
+                  </div>
                 </div>
 
                 <!-- 上传进度条 -->
@@ -305,6 +448,45 @@
       </div>
     </main>
 
+    <!-- Add Version Modal -->
+    <div v-if="showAddVersionModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+        <div class="mb-4">
+          <h2 class="text-lg font-semibold text-stone-800">Add New Version</h2>
+          <p class="mt-1 text-sm text-stone-500">Create a new version for this library</p>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-stone-700 mb-2">Version Name</label>
+            <input 
+              v-model="newVersionName"
+              type="text" 
+              placeholder="e.g., 1.0.0, 1.2.3-beta, 2.0.0-rc.1"
+              class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+            />
+            <p class="mt-1 text-xs text-stone-500">Semantic Versioning (e.g., 1.0.0, 1.2.3-beta). The 'v' prefix will be added automatically.</p>
+          </div>
+        </div>
+
+        <div class="mt-6 flex gap-3 justify-end">
+          <button 
+            class="px-4 py-2 rounded-lg border border-stone-300 text-sm font-medium text-stone-700 hover:bg-stone-50"
+            @click="showAddVersionModal = false"
+          >
+            Cancel
+          </button>
+          <button 
+            class="px-4 py-2 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            :disabled="!newVersionName.trim()"
+            @click="handleAddVersion"
+          >
+            Create Version
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <AppFooter />
   </div>
@@ -316,24 +498,29 @@ import { useRoute } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
-import { getLibrary, updateLibrary } from '@/api/library'
+import { getLibrary, updateLibrary, createVersion, deleteVersion, refreshVersion, deleteLibrary, getVersions } from '@/api/library'
+import { useRouter } from 'vue-router'
 import { getDocuments, deleteDocument, uploadDocumentWithSSE } from '@/api/document'
 import type { Library } from '@/api/library'
 import type { Document, ProcessStatus } from '@/api/document'
 
 const route = useRoute()
+const router = useRouter()
 const { isLoggedIn, userEmail, userPlan, initUserState, redirectToSSO } = useUser()
 
 const libraryId = computed(() => Number(route.params.id))
 const library = ref<Library>({
   id: 0,
   name: '',
-  version: '',
+  default_version: '',
+  versions: [],
+  source_type: '',
+  source_url: '',
   description: '',
-  status: '',
   document_count: 0,
   chunk_count: 0,
   token_count: 0,
+  status: '',
   created_at: '',
   updated_at: ''
 })
@@ -349,9 +536,22 @@ const uploadMessage = ref('')
 // Configuration form
 const editForm = reactive({
   name: '',
-  version: '',
   description: ''
 })
+
+// Versions
+interface VersionInfo {
+  version: string
+  token_count: number
+  chunk_count: number
+  last_updated: string
+}
+
+const versions = ref<VersionInfo[]>([])
+const loadingVersions = ref(false)
+const showAddVersionModal = ref(false)
+const newVersionName = ref('')
+const selectedVersion = ref('')
 
 // Documents
 const documents = ref<Document[]>([])
@@ -369,8 +569,25 @@ const fetchLibrary = async () => {
   if (res.code === 0) {
     library.value = res.data
     editForm.name = res.data.name
-    editForm.version = res.data.version
     editForm.description = res.data.description
+  }
+}
+
+const fetchVersions = async () => {
+  loadingVersions.value = true
+  try {
+    const res = await getVersions(libraryId.value)
+    if (res.code === 0) {
+      versions.value = res.data || []
+      // 自动选择第一个版本
+      if (versions.value.length > 0 && !selectedVersion.value) {
+        selectedVersion.value = versions.value[0].version
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch versions:', error)
+  } finally {
+    loadingVersions.value = false
   }
 }
 
@@ -393,7 +610,6 @@ const fetchDocuments = async () => {
 
 const resetForm = () => {
   editForm.name = library.value.name
-  editForm.version = library.value.version
   editForm.description = library.value.description
 }
 
@@ -415,6 +631,11 @@ const handleFileUpload = async (event: Event) => {
   const file = input.files?.[0]
   if (!file) return
 
+  if (!selectedVersion.value) {
+    alert('Please select a version first')
+    return
+  }
+
   const allowedTypes = ['.md', '.pdf', '.docx']
   const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
   if (!allowedTypes.includes(ext)) {
@@ -428,27 +649,65 @@ const handleFileUpload = async (event: Event) => {
   uploadMessage.value = 'Uploading...'
 
   try {
-    await uploadDocumentWithSSE(libraryId.value, file, {
-      onProgress: (status: ProcessStatus) => {
-        uploadProgress.value = status.progress
-        uploadMessage.value = status.message
-      },
-      onComplete: () => {
-        console.log('✓ Upload successful')
+    // 创建 FormData 并添加版本信息
+    const formData = new FormData()
+    formData.append('library_id', libraryId.value.toString())
+    formData.append('version', selectedVersion.value)
+    formData.append('file', file)
+
+    // 使用 SSE 上传
+    const eventSource = new EventSource(`/api/documents/upload-sse?library_id=${libraryId.value}&version=${selectedVersion.value}`)
+    
+    eventSource.addEventListener('parsing', (event) => {
+      const data = JSON.parse(event.data)
+      uploadProgress.value = 20
+      uploadMessage.value = 'Parsing document...'
+    })
+
+    eventSource.addEventListener('chunking', (event) => {
+      const data = JSON.parse(event.data)
+      uploadProgress.value = 50
+      uploadMessage.value = 'Chunking document...'
+    })
+
+    eventSource.addEventListener('embedding', (event) => {
+      const data = JSON.parse(event.data)
+      uploadProgress.value = 80
+      uploadMessage.value = 'Generating embeddings...'
+    })
+
+    eventSource.addEventListener('completed', (event) => {
+      const data = JSON.parse(event.data)
+      uploadProgress.value = 100
+      uploadMessage.value = 'Upload successful!'
+      console.log('✓ Upload successful')
+      eventSource.close()
+      
+      setTimeout(() => {
         uploading.value = false
         uploadProgress.value = 0
         uploadMessage.value = ''
         fetchDocuments()
-      },
-      onError: (error: Error) => {
-        alert('Upload failed: ' + error.message)
-        uploading.value = false
-        uploadProgress.value = 0
-        uploadMessage.value = ''
-      }
+        fetchVersions()
+      }, 500)
+    })
+
+    eventSource.addEventListener('error', (event) => {
+      console.error('Upload error:', event)
+      alert('Upload failed')
+      eventSource.close()
+      uploading.value = false
+      uploadProgress.value = 0
+      uploadMessage.value = ''
+    })
+
+    // 发送文件
+    const response = await fetch(`/api/documents/upload?library_id=${libraryId.value}&version=${selectedVersion.value}`, {
+      method: 'POST',
+      body: formData
     })
   } catch (error) {
-    alert('Upload failed')
+    alert('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
     uploading.value = false
   }
   
@@ -467,6 +726,22 @@ const refreshData = () => {
   fetchLibrary()
   if (activeTab.value === 'documents') {
     fetchDocuments()
+  }
+}
+
+const handleDeleteLibrary = async () => {
+  if (!confirm(`Are you sure you want to delete the library "${library.value.name}"? This action cannot be undone.`)) return
+  
+  try {
+    const res = await deleteLibrary(libraryId.value)
+    if (res.code === 0) {
+      console.log('✓ Library deleted')
+      alert('Library deleted successfully')
+      router.push('/')
+    }
+  } catch (error) {
+    console.error('Failed to delete library:', error)
+    alert('Failed to delete library: ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -503,10 +778,77 @@ const handleReprocess = async (id: number) => {
   alert('Reprocess feature coming soon')
 }
 
-// 切换到 documents tab 时加载文档
+const handleRefreshVersion = async (version: string) => {
+  if (!confirm(`Refresh version "${version}"? This will reprocess all documents in this version.`)) return
+  
+  try {
+    const res = await refreshVersion(libraryId.value, version)
+    if (res.code === 0) {
+      console.log('✓ Version refresh started')
+      alert('Version refresh started. Documents will be reprocessed in the background.')
+      await fetchVersions()
+    }
+  } catch (error) {
+    console.error('Failed to refresh version:', error)
+    alert('Failed to refresh version: ' + (error instanceof Error ? error.message : 'Unknown error'))
+  }
+}
+
+const handleDeleteVersion = async (version: string) => {
+  if (!confirm(`Are you sure you want to delete version "${version}"? This will delete all documents in this version.`)) return
+  
+  try {
+    const res = await deleteVersion(libraryId.value, version)
+    if (res.code === 0) {
+      console.log('✓ Version deleted')
+      alert('Version deleted successfully')
+      await fetchVersions()
+    }
+  } catch (error) {
+    console.error('Failed to delete version:', error)
+    alert('Failed to delete version: ' + (error instanceof Error ? error.message : 'Unknown error'))
+  }
+}
+
+const handleAddVersion = async () => {
+  if (!newVersionName.value.trim()) {
+    alert('Please enter a version name')
+    return
+  }
+
+  try {
+    // 自动添加 v 前缀
+    const versionWithPrefix = newVersionName.value.startsWith('v') 
+      ? newVersionName.value 
+      : `v${newVersionName.value}`
+    
+    const res = await createVersion(libraryId.value, versionWithPrefix)
+    if (res.code === 0) {
+      console.log('✓ Version created')
+      showAddVersionModal.value = false
+      newVersionName.value = ''
+      await fetchVersions()
+    }
+  } catch (error) {
+    console.error('Failed to add version:', error)
+    alert('Failed to add version: ' + (error instanceof Error ? error.message : 'Unknown error'))
+  }
+}
+
+// 切换到 documents tab 时加载文档和版本
 watch(activeTab, (newTab) => {
-  if (newTab === 'documents' && documents.value.length === 0) {
-    fetchDocuments()
+  if (newTab === 'documents') {
+    if (documents.value.length === 0) {
+      fetchDocuments()
+    }
+    if (versions.value.length === 0) {
+      fetchVersions()
+    }
+  }
+  if (newTab === 'versions') {
+    if (versions.value.length === 0) {
+      fetchVersions()
+    }
   }
 })
 
@@ -517,6 +859,8 @@ onMounted(() => {
   // 检查 URL 参数
   if (route.query.tab === 'documents') {
     activeTab.value = 'documents'
+    fetchDocuments()
+    fetchVersions()
   }
 })
 </script>

@@ -311,6 +311,39 @@ go-mcp-context/
 
 ## 📝 开发日志
 
+### 2025-12-15
+
+#### Added
+- **版本管理系统**
+  - 库创建时初始化 `default_version = "default"`，`versions = []`（versions 不包含 default）
+  - 实现 `GetVersions` API，直接从 Library 表读取，返回 default_version 在前，versions 倒序在后
+  - 前端 `library.ts` 添加 `getVersions()` 接口
+
+- **后端初始化**
+  - `main.go` 添加 `InitStorage()` 和 `InitLLM()` 初始化
+  - 添加时区同步：`time.Local = time.FixedZone("CST", 8*3600)`
+
+- **前端 API 统一**
+  - 重构 `library.ts` 接口定义，分离 `LibraryListItem` 和 `Library` 类型
+  - 移除 `admin.vue` 原生 fetch 调用，统一使用 API 接口
+  - `admin.vue` 延迟加载版本列表（只在切换标签页时加载）
+
+- **时间显示优化**
+  - 更新 `home/index.vue` 和 `detail.vue` 的 `formatDate()` 函数
+  - 支持分钟级精度：`just now`、`5 minutes`、`1 hour`、`2 days`、`1 week` 等
+  - 处理未来时间和无效时间戳（显示 "now"）
+
+#### Changed
+- Library 数据模型：`Versions` 字段分离，不包含 "default"
+- 库列表响应：使用 `LibraryListItem` 精简字段
+- 路由参数格式：`:id` → `/:id`（Gin 标准格式）
+
+#### Fixed
+- 时间戳显示 "-1 days" 问题
+- 版本列表 API 404 问题
+
+---
+
 ### 2025-12-07
 
 #### Added

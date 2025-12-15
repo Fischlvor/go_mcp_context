@@ -2,7 +2,8 @@ package request
 
 // DocumentUpload 文档上传请求（form-data）
 type DocumentUpload struct {
-	LibraryID uint `form:"library_id" binding:"required"`
+	LibraryID uint   `form:"library_id" binding:"required"`
+	Version   string `form:"version"` // 文档版本，默认为 "latest"
 	// file 通过 FormFile 获取
 }
 

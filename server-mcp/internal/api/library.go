@@ -106,3 +106,86 @@ func (l *LibraryApi) Delete(c *gin.Context) {
 
 	response.OkWithMessage("删除成功", c)
 }
+
+// GetVersions 获取库的所有版本（用于上传时选择）
+func (l *LibraryApi) GetVersions(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.FailWithMessage("无效的ID", c)
+		return
+	}
+
+	versions, err := libraryService.GetVersions(uint(id))
+	if err != nil {
+		response.FailWithMessage("获取版本列表失败: "+err.Error(), c)
+		return
+	}
+
+	response.OkWithData(versions, c)
+}
+
+// CreateVersion 创建新版本
+func (l *LibraryApi) CreateVersion(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.FailWithMessage("无效的ID", c)
+		return
+	}
+
+	var req request.VersionCreate
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailWithMessage("参数错误: "+err.Error(), c)
+		return
+	}
+
+	if err := libraryService.CreateVersion(uint(id), req.Version); err != nil {
+		response.FailWithMessage("创建版本失败: "+err.Error(), c)
+		return
+	}
+
+	response.OkWithMessage("版本创建成功", c)
+}
+
+// DeleteVersion 删除版本及其所有文档
+func (l *LibraryApi) DeleteVersion(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.FailWithMessage("无效的ID", c)
+		return
+	}
+
+	version := c.Param("version")
+	if version == "" {
+		response.FailWithMessage("版本不能为空", c)
+		return
+	}
+
+	if err := libraryService.DeleteVersion(uint(id), version); err != nil {
+		response.FailWithMessage("删除版本失败: "+err.Error(), c)
+		return
+	}
+
+	response.OkWithMessage("版本删除成功", c)
+}
+
+// RefreshVersion 刷新版本（重新处理所有文档）
+func (l *LibraryApi) RefreshVersion(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.FailWithMessage("无效的ID", c)
+		return
+	}
+
+	version := c.Param("version")
+	if version == "" {
+		response.FailWithMessage("版本不能为空", c)
+		return
+	}
+
+	if err := libraryService.RefreshVersion(uint(id), version); err != nil {
+		response.FailWithMessage("刷新版本失败: "+err.Error(), c)
+		return
+	}
+
+	response.OkWithMessage("版本刷新已启动，请稍候", c)
+}
