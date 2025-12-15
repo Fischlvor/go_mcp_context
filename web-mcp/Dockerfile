@@ -28,8 +28,9 @@ RUN npm run build-only
 # 第二阶段：运行阶段
 FROM nginx:alpine
 
-# 使用国内镜像源加速
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+# 使用国内镜像源加速,安装 wget 用于 healthcheck
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk --no-cache add wget
 
 # 复制构建产物到nginx目录
 COPY --from=builder /app/dist /usr/share/nginx/html

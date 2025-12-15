@@ -41,7 +41,7 @@ func InitGorm() *gorm.DB {
 func InitTables() {
 	if err := global.DB.AutoMigrate(
 		&dbmodel.Library{},
-		&dbmodel.Document{},
+		&dbmodel.DocumentUpload{}, // 原 Document 改为 DocumentUpload
 		&dbmodel.DocumentChunk{},
 		&dbmodel.SearchCache{},
 		&dbmodel.APIKey{},

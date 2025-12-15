@@ -22,26 +22,55 @@
                   <h2 class="flex items-center gap-2 text-xl font-semibold leading-[100%] tracking-[0%] text-stone-800">
                     {{ library.name }}
                   </h2>
+                  <!-- 源链接或 Local -->
                   <div class="w-fit max-w-full">
-                    <span class="block overflow-hidden text-ellipsis whitespace-nowrap text-base font-normal leading-normal text-stone-500">
-                      Version: {{ library.version }}
+                    <a 
+                      v-if="library.source_type === 'github' && library.source_url"
+                      :href="`https://github.com/${library.source_url}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="block overflow-hidden text-ellipsis whitespace-nowrap text-base font-normal leading-normal text-stone-500 underline decoration-solid decoration-from-font hover:text-stone-700"
+                      :title="`https://github.com/${library.source_url}`"
+                    >
+                      https://github.com/{{ library.source_url }}
+                    </a>
+                    <span 
+                      v-else
+                      class="block overflow-hidden text-ellipsis whitespace-nowrap text-base font-normal leading-normal text-stone-500"
+                    >
+                      Local
                     </span>
                   </div>
+                  <!-- 可展开的描述 -->
                   <h3 class="text-base font-normal leading-[140%] text-stone-500">
-                    {{ library.description || 'No description' }}
+                    <span v-if="!expandDescription && isTruncated(library.description)" class="inline-flex items-center gap-0">
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ getTruncatedText(library.description) }}</span><span 
+                        class="cursor-pointer text-emerald-600 hover:text-emerald-700 hover:underline flex-shrink-0"
+                        @click="expandDescription = true"
+                      >...</span>
+                    </span>
+                    <span v-else-if="expandDescription">
+                      {{ library.description || 'No description' }}<span 
+                        class="cursor-pointer text-emerald-600 hover:text-emerald-700 hover:underline"
+                        @click="expandDescription = false"
+                      > collapse</span>
+                    </span>
+                    <span v-else>
+                      {{ library.description || 'No description' }}
+                    </span>
                   </h3>
                 </div>
                 <!-- Manage 按钮 -->
                 <div class="relative inline-flex">
                   <router-link 
                     :to="`/libraries/${libraryId}/admin`"
-                    class="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-stone-300 text-base text-stone-500 transition hover:border-stone-400 px-3 py-2"
+                    class="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-stone-300 text-base text-stone-500 transition hover:border-stone-400 px-3 py-2 !border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-stone-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-emerald-600">
                       <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"></path>
                       <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
                     </svg>
-                    <span>Manage</span>
+                    <span class="text-emerald-600">Manage</span>
                   </router-link>
                 </div>
               </div>
@@ -50,23 +79,25 @@
               <div class="flex flex-col-reverse gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                 <div class="flex flex-wrap gap-2 text-sm sm:gap-1">
                   <div class="flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-emerald-800">
-                      <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
-                      <path d="M9 12l2 2l4 -4"></path>
-                    </svg>
-                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-emerald-800">{{ library.status === 'active' ? 'Active' : library.status }}</span>
+                    <div class="flex h-5 w-5 items-center justify-center text-emerald-800">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tabler-icon tabler-icon-circle-check">
+                        <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
+                        <path d="M9 12l2 2l4 -4"></path>
+                      </svg>
+                    </div>
+                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-emerald-800">{{ library.status === 'active' ? 'Completed' : library.status }}</span>
                   </div>
                   <div class="flex items-center gap-1 rounded-md bg-stone-100 px-3 py-1.5">
                     <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-500">Tokens:</span>
-                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatNumber(library.token_count || 0) }}</span>
+                    <span class="font-variant-numeric-zero:slashed-zero text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatNumber(library.token_count || 0) }}</span>
                   </div>
                   <div class="flex items-center gap-1 rounded-md bg-stone-100 px-3 py-1.5">
                     <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-500">Documents:</span>
-                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatNumber(library.document_count || 0) }}</span>
+                    <span class="font-variant-numeric-zero:slashed-zero text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatNumber(library.document_count || 0) }}</span>
                   </div>
                   <div class="flex items-center gap-1 rounded-md bg-stone-100 px-3 py-1.5">
                     <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-500">Update:</span>
-                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatDate(library.updated_at) }}</span>
+                    <span class="font-variant-numeric-zero:slashed-zero text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatDate(library.updated_at) }}</span>
                   </div>
                 </div>
               </div>
@@ -259,7 +290,10 @@ const documentTitle = computed(() => route.params.title as string | undefined)
 const library = ref<Library>({
   id: 0,
   name: '',
-  version: '',
+  default_version: '',
+  versions: [],
+  source_type: '',
+  source_url: '',
   description: '',
   status: '',
   document_count: 0,
@@ -278,6 +312,7 @@ const searchResults = ref<SearchResultItem[]>([])
 const hasSearched = ref(false)
 const currentDocTitle = ref('')
 const loadingDoc = ref(false)
+const expandDescription = ref(false)
 
 const handleSignIn = () => {
   redirectToSSO()
@@ -373,15 +408,43 @@ const formatDate = (dateStr: string) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   
-  if (days === 0) return 'today'
-  if (days === 1) return '1 day ago'
-  if (days < 7) return `${days} days ago`
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`
-  if (days < 365) return `${Math.floor(days / 30)} months ago`
-  return `${Math.floor(days / 365)} years ago`
+  // 如果时间戳无效或是未来时间，显示 'now'
+  if (isNaN(date.getTime()) || date > now) {
+    return 'now'
+  }
+  
+  const diff = now.getTime() - date.getTime()
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  const years = Math.floor(days / 365)
+  
+  // Context7 风格：简洁的数字 + 时间单位
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''}`
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''}`
+  if (days < 7) return `${days} day${days > 1 ? 's' : ''}`
+  if (weeks < 4) return `${weeks} week${weeks > 1 ? 's' : ''}`
+  if (months < 12) return `${months} month${months > 1 ? 's' : ''}`
+  return `${years} year${years > 1 ? 's' : ''}`
+}
+
+// 检查描述是否需要截断（超过150个字符）
+const isTruncated = (text: string | undefined) => {
+  if (!text) return false
+  return text.length > 70
+}
+
+// 获取截断的文本
+const getTruncatedText = (text: string | undefined) => {
+  if (!text) return 'No description'
+  if (text.length > 70) {
+    return text.substring(0, 70)
+  }
+  return text
 }
 
 onMounted(() => {

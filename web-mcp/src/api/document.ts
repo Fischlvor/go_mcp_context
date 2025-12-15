@@ -5,6 +5,7 @@ import { uploadWithSSE, type SSEOptions, type SSEEvent } from '@/utils/sse'
 export interface Document {
   id: number
   library_id: number
+  version: string
   title: string
   file_path: string
   file_type: string
@@ -45,10 +46,11 @@ export const getDocuments = (params: { library_id: number; page?: number; page_s
 }
 
 // 上传文档（普通方式）
-export const uploadDocument = (libraryId: number, file: File): Promise<ApiResponse<Document>> => {
+export const uploadDocument = (libraryId: number, file: File, version: string = 'latest'): Promise<ApiResponse<Document>> => {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('library_id', String(libraryId))
+  formData.append('version', version)
   
   return service({
     url: '/documents/upload',
@@ -68,12 +70,13 @@ export const uploadDocumentWithSSE = (
     onProgress?: (status: ProcessStatus) => void
     onComplete?: (status: ProcessStatus) => void
     onError?: (error: Error) => void
-  }
+  },
+  version: string = 'latest'
 ): Promise<void> => {
   return uploadWithSSE(
     '/documents/upload-sse',
     file,
-    { library_id: String(libraryId) },
+    { library_id: String(libraryId), version },
     {
       onMessage: (event: SSEEvent<ProcessStatus>) => {
         console.log('[SSE] Received event:', event)
