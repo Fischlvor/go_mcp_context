@@ -66,23 +66,6 @@
                     </svg>
                     Versions
                   </button>
-                  <button 
-                    :class="[
-                      '-mb-px flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-base font-medium',
-                      activeTab === 'documents' 
-                        ? 'relative z-10 border border-stone-300 border-b-stone-50 bg-stone-50 text-stone-800' 
-                        : 'border border-stone-300 border-b-transparent text-stone-500 hover:border-stone-400 hover:text-stone-600'
-                    ]"
-                    @click="activeTab = 'documents'"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
-                      <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
-                      <path d="M9 17h6"></path>
-                      <path d="M9 13h6"></path>
-                    </svg>
-                    Documents
-                  </button>
                 </div>
               </div>
               <!-- 工具栏 -->
@@ -218,7 +201,14 @@
                               <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path>
                               <path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3z"></path>
                             </svg>
-                            <span class="transition-colors hover:text-emerald-600">{{ version.version }}</span>
+                            <router-link 
+                              :to="version.version === library.default_version 
+                                ? `/libraries/${libraryId}` 
+                                : `/libraries/${libraryId}/${version.version}`"
+                              class="transition-colors hover:text-emerald-600 hover:underline"
+                            >
+                              {{ version.version }}
+                            </router-link>
                             <span v-if="version.version === library.default_version" class="ml-1 rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-semibold text-white">Default</span>
                           </div>
                         </td>
@@ -265,180 +255,6 @@
                       </tr>
                     </tbody>
                   </table>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Documents Tab -->
-          <div v-if="activeTab === 'documents'" class="mt-8">
-            <div class="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
-              <div class="space-y-6">
-                <!-- 标题和上传按钮 -->
-                <div class="flex items-center justify-between">
-                  <div>
-                    <h3 class="text-base font-semibold text-stone-800">Documents</h3>
-                    <p class="mt-1 text-sm text-stone-500">Upload documents to a specific version</p>
-                  </div>
-                  <div class="flex items-center gap-2 sm:gap-3">
-                    <!-- 版本选择下拉框 -->
-                    <select 
-                      v-model="selectedVersion"
-                      class="h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 bg-white hover:border-emerald-600"
-                      :disabled="uploading || versions.length === 0"
-                    >
-                      <option value="">Select version...</option>
-                      <option v-for="version in versions" :key="version.version" :value="version.version">
-                        {{ version.version }} ({{ formatNumber(version.token_count) }} tokens)
-                      </option>
-                    </select>
-                    <!-- 上传按钮 -->
-                    <label 
-                      :class="[
-                        'flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-white transition-colors whitespace-nowrap',
-                        uploading || !selectedVersion ? 'bg-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer'
-                      ]"
-                    >
-                      <svg v-if="!uploading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path>
-                        <path d="M7 9l5 -5l5 5"></path>
-                        <path d="M12 4l0 12"></path>
-                      </svg>
-                      <svg v-else class="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span class="hidden sm:inline">{{ uploading ? 'Processing...' : 'Upload' }}</span>
-                      <span class="sm:hidden">{{ uploading ? '...' : 'Upload' }}</span>
-                      <input 
-                        type="file" 
-                        class="hidden" 
-                        accept=".md,.pdf,.docx"
-                        :disabled="uploading || !selectedVersion"
-                        @change="handleFileUpload"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <!-- 上传进度条 -->
-                <div v-if="uploading" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-emerald-800">{{ uploadMessage }}</span>
-                    <span class="text-sm font-medium text-emerald-800">{{ uploadProgress }}%</span>
-                  </div>
-                  <div class="h-2 w-full overflow-hidden rounded-full bg-emerald-200">
-                    <div 
-                      class="h-full rounded-full bg-emerald-600 transition-all duration-300"
-                      :style="{ width: uploadProgress + '%' }"
-                    ></div>
-                  </div>
-                </div>
-
-                <!-- 文档列表表格 -->
-                <div class="w-full overflow-x-auto md:overflow-x-visible">
-                  <table class="w-full min-w-[600px] table-fixed border-b border-stone-200">
-                    <thead class="border-b border-stone-200">
-                      <tr>
-                        <th class="w-[240px] px-2 py-3 text-left text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Title</th>
-                        <th class="w-[120px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Tokens</th>
-                        <th class="w-[120px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Snippets</th>
-                        <th class="w-[160px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Last Updated</th>
-                        <th class="w-[100px] px-1 py-3 text-center text-sm font-normal uppercase leading-none text-stone-400">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-stone-200">
-                      <!-- 空状态 -->
-                      <tr v-if="documents.length === 0 && !loadingDocs">
-                        <td colspan="5" class="py-12 text-center">
-                          <div class="flex flex-col items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-stone-300">
-                              <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
-                              <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
-                            </svg>
-                            <p class="text-sm font-medium text-stone-500">No documents yet</p>
-                            <p class="text-sm text-stone-400">Upload your first document to get started</p>
-                          </div>
-                        </td>
-                      </tr>
-                      <!-- 文档行 -->
-                      <tr v-for="doc in documents" :key="doc.id" class="group transition-colors hover:bg-white">
-                        <td class="h-11 px-2 align-middle sm:px-4">
-                          <div class="flex items-center gap-2 text-base font-normal leading-tight text-stone-800">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0">
-                              <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
-                              <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
-                            </svg>
-                            <router-link 
-                              :to="`/libraries/${libraryId}/${encodeURIComponent(doc.title)}`"
-                              class="transition-colors hover:text-emerald-600 hover:underline truncate"
-                            >
-                              {{ doc.title }}
-                            </router-link>
-                          </div>
-                        </td>
-                        <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
-                          {{ formatNumber(doc.token_count || 0) }}
-                        </td>
-                        <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
-                          {{ formatNumber(doc.chunk_count || 0) }}
-                        </td>
-                        <td class="h-11 px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
-                          {{ formatDateShort(doc.updated_at) }}
-                        </td>
-                        <td class="h-11 px-1 text-center align-middle">
-                          <div class="flex items-center justify-center gap-2">
-                            <!-- 刷新按钮 -->
-                            <button 
-                              class="flex items-center justify-center text-stone-500 transition-colors hover:text-emerald-600"
-                              title="Reprocess"
-                              @click="handleReprocess(doc.id)"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path>
-                                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path>
-                              </svg>
-                            </button>
-                            <!-- 删除按钮 -->
-                            <button 
-                              class="flex items-center justify-center text-stone-500 transition-colors hover:text-red-600"
-                              title="Delete"
-                              @click="handleDelete(doc.id)"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 7l16 0"></path>
-                                <path d="M10 11l0 6"></path>
-                                <path d="M14 11l0 6"></path>
-                                <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
-                                <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- 分页 -->
-                <div v-if="totalDocs > pageSize" class="flex items-center justify-between border-t border-stone-200 pt-4">
-                  <span class="text-sm text-stone-500">{{ totalDocs }} documents</span>
-                  <div class="flex gap-2">
-                    <button 
-                      class="h-8 px-3 rounded-lg border border-stone-300 text-sm text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-                      :disabled="page === 1"
-                      @click="page--; fetchDocuments()"
-                    >
-                      Previous
-                    </button>
-                    <button 
-                      class="h-8 px-3 rounded-lg border border-stone-300 text-sm text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-                      :disabled="page * pageSize >= totalDocs"
-                      @click="page++; fetchDocuments()"
-                    >
-                      Next
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>

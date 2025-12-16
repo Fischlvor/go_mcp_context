@@ -9,10 +9,8 @@ type DocumentUpload struct {
 
 // DocumentList 文档列表请求
 type DocumentList struct {
-	LibraryID *uint   `json:"library_id" form:"library_id"`
-	Title     *string `json:"title" form:"title"`
-	FileType  *string `json:"file_type" form:"file_type"`
-	Status    *string `json:"status" form:"status"`
+	LibraryID *uint   `json:"library_id" form:"library_id" binding:"required"`
+	Version   *string `json:"version" form:"version"` // 版本过滤（可选）
 	PageInfo
 }
 

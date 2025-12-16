@@ -126,6 +126,23 @@
                     </svg>
                     Context
                   </button>
+                  <button 
+                    :class="[
+                      '-mb-px flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-base font-medium',
+                      activeTab === 'documents' 
+                        ? 'relative z-10 border border-stone-300 border-b-stone-50 bg-stone-50 text-stone-800' 
+                        : 'border border-stone-300 border-b-transparent text-stone-500 hover:border-stone-400 hover:text-stone-600'
+                    ]"
+                    @click="activeTab = 'documents'"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                      <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                      <path d="M9 17h6"></path>
+                      <path d="M9 13h6"></path>
+                    </svg>
+                    Documents
+                  </button>
                 </div>
               </div>
               <!-- 工具栏 -->
@@ -261,6 +278,91 @@
               </div>
             </div>
           </div>
+
+          <!-- Documents Tab 内容 -->
+          <div v-if="activeTab === 'documents'" class="mt-8">
+            <div class="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+              <div class="space-y-6">
+                <!-- 标题 -->
+                <div>
+                  <h3 class="text-base font-semibold text-stone-800">Documents</h3>
+                  <p class="mt-1 text-sm text-stone-500">
+                    {{ version ? `Documents in version ${version}` : 'All documents' }}
+                  </p>
+                </div>
+
+                <!-- 文档列表表格 -->
+                <div class="w-full overflow-x-auto md:overflow-x-visible">
+                  <table class="w-full min-w-[600px] table-fixed border-b border-stone-200">
+                    <thead class="border-b border-stone-200">
+                      <tr>
+                        <th class="w-[240px] px-2 py-3 text-left text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Title</th>
+                        <th class="w-[120px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Tokens</th>
+                        <th class="w-[120px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Snippets</th>
+                        <th class="w-[160px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Last Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-200">
+                      <!-- 空状态 -->
+                      <tr v-if="documents.length === 0 && !loadingDocs">
+                        <td colspan="4" class="py-12 text-center">
+                          <div class="flex flex-col items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-stone-300">
+                              <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                              <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                            </svg>
+                            <p class="text-sm font-medium text-stone-500">No documents</p>
+                          </div>
+                        </td>
+                      </tr>
+                      <!-- 文档行 -->
+                      <tr v-for="doc in documents" :key="doc.id" class="group transition-colors hover:bg-white">
+                        <td class="h-11 px-2 align-middle sm:px-4">
+                          <div class="flex items-center gap-2 text-base font-normal leading-tight text-stone-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0">
+                              <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                              <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                            </svg>
+                            <span class="truncate">{{ doc.title }}</span>
+                          </div>
+                        </td>
+                        <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatNumber(doc.token_count || 0) }}
+                        </td>
+                        <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatNumber(doc.chunk_count || 0) }}
+                        </td>
+                        <td class="h-11 px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatDateShort(doc.updated_at) }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- 分页 -->
+                <div v-if="totalDocs > pageSize" class="flex items-center justify-between border-t border-stone-200 pt-4">
+                  <span class="text-sm text-stone-500">{{ totalDocs }} documents</span>
+                  <div class="flex gap-2">
+                    <button 
+                      class="h-8 px-3 rounded-lg border border-stone-300 text-sm text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                      :disabled="page === 1"
+                      @click="page--; fetchDocumentsList()"
+                    >
+                      Previous
+                    </button>
+                    <button 
+                      class="h-8 px-3 rounded-lg border border-stone-300 text-sm text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                      :disabled="page * pageSize >= totalDocs"
+                      @click="page++; fetchDocumentsList()"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -277,7 +379,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
 import { getLibrary } from '@/api/library'
-import { getLatestCode } from '@/api/document'
+import { getLatestCode, getDocuments } from '@/api/document'
 import { searchDocuments } from '@/api/search'
 import type { Library } from '@/api/library'
 import type { SearchResultItem } from '@/api/search'
@@ -286,7 +388,14 @@ const route = useRoute()
 const { isLoggedIn, userEmail, userPlan, initUserState, redirectToSSO } = useUser()
 
 const libraryId = computed(() => Number(route.params.id))
-const documentTitle = computed(() => route.params.title as string | undefined)
+const version = computed(() => {
+  // 只有在 /libraries/:id/:version/:title 时才有版本
+  return route.params.version as string | undefined
+})
+const documentTitle = computed(() => {
+  // 只有在 /libraries/:id/:version/:title 时才有 title
+  return route.params.title as string | undefined
+})
 const library = ref<Library>({
   id: 0,
   name: '',
@@ -314,6 +423,13 @@ const currentDocTitle = ref('')
 const loadingDoc = ref(false)
 const expandDescription = ref(false)
 
+// Documents tab
+const documents = ref<any[]>([])
+const loadingDocs = ref(false)
+const page = ref(1)
+const pageSize = ref(10)
+const totalDocs = ref(0)
+
 const handleSignIn = () => {
   redirectToSSO()
 }
@@ -331,8 +447,8 @@ const fetchDocument = async () => {
   searchResult.value = 'Loading document...'
   
   try {
-    // 直接调用新接口获取最新文档内容
-    const res = await getLatestCode(libraryId.value)
+    // 获取指定版本的最新文档内容（如果指定了版本）
+    const res = await getLatestCode(libraryId.value, version.value)
     if (res.code === 0) {
       currentDocTitle.value = res.data.title
       searchResult.value = res.data.content || 'No content available.'
@@ -343,6 +459,27 @@ const fetchDocument = async () => {
     searchResult.value = 'Failed to load document.'
   } finally {
     loadingDoc.value = false
+  }
+}
+
+// 加载文档列表
+const fetchDocumentsList = async () => {
+  loadingDocs.value = true
+  try {
+    const res = await getDocuments({
+      library_id: libraryId.value,
+      version: version.value,
+      page: page.value,
+      page_size: pageSize.value
+    })
+    if (res.code === 0) {
+      documents.value = res.data.list || []
+      totalDocs.value = res.data.total
+    }
+  } catch (error) {
+    console.error('Failed to fetch documents:', error)
+  } finally {
+    loadingDocs.value = false
   }
 }
 
@@ -404,6 +541,12 @@ const formatNumber = (num: number) => {
   return num.toString()
 }
 
+const formatDateShort = (dateStr: string) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
@@ -451,6 +594,13 @@ onMounted(() => {
   initUserState()
   fetchLibrary()
   fetchDocument()
+})
+
+// 监听 activeTab 变化，切换到 documents 时加载文档列表
+watch(activeTab, (newTab) => {
+  if (newTab === 'documents' && documents.value.length === 0) {
+    fetchDocumentsList()
+  }
 })
 
 // 监听路由参数变化

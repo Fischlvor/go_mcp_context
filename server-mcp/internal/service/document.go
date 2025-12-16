@@ -32,18 +32,11 @@ func (s *DocumentService) List(req *request.DocumentList) (*response.PageResult,
 	if req.LibraryID != nil && *req.LibraryID > 0 {
 		db = db.Where("library_id = ?", *req.LibraryID)
 	}
-	if req.Title != nil && *req.Title != "" {
-		db = db.Where("title LIKE ?", "%"+*req.Title+"%")
+	if req.Version != nil && *req.Version != "" {
+		db = db.Where("version = ?", *req.Version)
 	}
-	if req.FileType != nil && *req.FileType != "" {
-		db = db.Where("file_type = ?", *req.FileType)
-	}
-	if req.Status != nil && *req.Status != "" {
-		db = db.Where("status = ?", *req.Status)
-	} else {
-		// 默认查询非删除状态的文档
-		db = db.Where("status != ?", "deleted")
-	}
+	// 默认查询非删除状态的文档
+	db = db.Where("status != ?", "deleted")
 
 	// 计算总数
 	if err := db.Count(&total).Error; err != nil {
