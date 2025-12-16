@@ -18,7 +18,7 @@ import (
 type DocumentProcessor struct{}
 
 // ProcessDocument 处理文档（解析、分块、生成 Embedding）
-func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.Document, content []byte) error {
+func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content []byte) error {
 	// 1. 解析文档内容
 	text, err := p.parseDocument(doc.FileType, content)
 	if err != nil {
@@ -26,7 +26,7 @@ func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.Document, content []byt
 	}
 
 	// 2. 分块
-	chunks := p.chunkText(text, doc.ID, doc.LibraryID)
+	chunks := p.chunkText(text, doc.ID, doc.LibraryID, doc.Version, doc.FilePath)
 	if len(chunks) == 0 {
 		return nil
 	}
@@ -61,7 +61,7 @@ func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.Document, content []byt
 	}
 
 	// 6. 更新文档状态和统计信息
-	doc.Status = "active"
+	doc.Status = "completed"
 	doc.ChunkCount = len(chunks)
 	doc.TokenCount = totalTokens
 	if err := global.DB.Save(doc).Error; err != nil {
@@ -98,7 +98,7 @@ type MarkdownSection struct {
 
 // chunkText 文本分块（Markdown 语义分块，带标题元数据）
 // 参考 LangChain MarkdownHeaderTextSplitter 的设计
-func (p *DocumentProcessor) chunkText(text string, documentID, libraryID uint) []*dbmodel.DocumentChunk {
+func (p *DocumentProcessor) chunkText(text string, uploadID, libraryID uint, version, source string) []*dbmodel.DocumentChunk {
 	chunkSize := global.Config.Chunker.ChunkSize
 	if chunkSize <= 0 {
 		chunkSize = 512
@@ -120,14 +120,14 @@ func (p *DocumentProcessor) chunkText(text string, documentID, libraryID uint) [
 
 		// 如果 section 小于 chunkSize，直接作为一个 chunk
 		if sectionTokens <= chunkSize {
-			chunk := p.createChunkWithMetadata(content, chunkIndex, documentID, libraryID, sectionTokens, section.Headers)
+			chunk := p.createChunkWithMetadata(content, chunkIndex, uploadID, libraryID, version, source, sectionTokens, section.Headers)
 			chunks = append(chunks, chunk)
 			chunkIndex++
 			continue
 		}
 
 		// section 超过 chunkSize，按段落分割（继承标题元数据）
-		subChunks := p.splitLargeSectionWithMetadata(content, chunkSize, chunkIndex, documentID, libraryID, section.Headers)
+		subChunks := p.splitLargeSectionWithMetadata(content, chunkSize, chunkIndex, uploadID, libraryID, version, source, section.Headers)
 		chunks = append(chunks, subChunks...)
 		chunkIndex += len(subChunks)
 	}
@@ -240,8 +240,10 @@ func copyHeaders(headers map[string]string) map[string]string {
 }
 
 // createChunkWithMetadata 创建带元数据的文档块
-func (p *DocumentProcessor) createChunkWithMetadata(text string, index int, documentID, libraryID uint, tokens int, headers map[string]string) *dbmodel.DocumentChunk {
+func (p *DocumentProcessor) createChunkWithMetadata(text string, index int, uploadID, libraryID uint, version, source string, tokens int, headers map[string]string) *dbmodel.DocumentChunk {
 	chunkType := p.detectChunkType(text)
+	codeBlock := p.extractCodeBlock(text)
+	language := p.detectLanguage(text)
 
 	// 构建元数据
 	metadata := make(dbmodel.JSON)
@@ -249,10 +251,18 @@ func (p *DocumentProcessor) createChunkWithMetadata(text string, index int, docu
 		metadata[k] = v
 	}
 
+	// 生成标题（使用标题层级构建）
+	title := p.buildTitleFromHeaders(headers)
+
 	return &dbmodel.DocumentChunk{
-		DocumentID: documentID,
 		LibraryID:  libraryID,
+		UploadID:   uploadID,
+		Version:    version,
 		ChunkIndex: index,
+		Title:      title,
+		Source:     source,
+		Language:   language,
+		Code:       codeBlock,
 		ChunkText:  text,
 		Tokens:     tokens,
 		ChunkType:  chunkType,
@@ -262,7 +272,7 @@ func (p *DocumentProcessor) createChunkWithMetadata(text string, index int, docu
 }
 
 // splitLargeSectionWithMetadata 分割超大 section（保持代码块完整）
-func (p *DocumentProcessor) splitLargeSectionWithMetadata(text string, chunkSize int, startIndex int, documentID, libraryID uint, headers map[string]string) []*dbmodel.DocumentChunk {
+func (p *DocumentProcessor) splitLargeSectionWithMetadata(text string, chunkSize int, startIndex int, uploadID, libraryID uint, version, source string, headers map[string]string) []*dbmodel.DocumentChunk {
 	var chunks []*dbmodel.DocumentChunk
 
 	// 先拆成原子单元（代码块作为整体，其他按段落）
@@ -284,14 +294,14 @@ func (p *DocumentProcessor) splitLargeSectionWithMetadata(text string, chunkSize
 		if atomTokens > chunkSize {
 			// 先保存当前累积的内容
 			if currentChunk.Len() > 0 {
-				chunk := p.createChunkWithMetadata(currentChunk.String(), chunkIndex, documentID, libraryID, currentTokens, headers)
+				chunk := p.createChunkWithMetadata(currentChunk.String(), chunkIndex, uploadID, libraryID, version, source, currentTokens, headers)
 				chunks = append(chunks, chunk)
 				chunkIndex++
 				currentChunk.Reset()
 				currentTokens = 0
 			}
 			// 大原子块单独成 chunk
-			chunk := p.createChunkWithMetadata(atom, chunkIndex, documentID, libraryID, atomTokens, headers)
+			chunk := p.createChunkWithMetadata(atom, chunkIndex, uploadID, libraryID, version, source, atomTokens, headers)
 			chunks = append(chunks, chunk)
 			chunkIndex++
 			continue
@@ -299,7 +309,7 @@ func (p *DocumentProcessor) splitLargeSectionWithMetadata(text string, chunkSize
 
 		// 正常累积
 		if currentTokens+atomTokens > chunkSize && currentTokens > 0 {
-			chunk := p.createChunkWithMetadata(currentChunk.String(), chunkIndex, documentID, libraryID, currentTokens, headers)
+			chunk := p.createChunkWithMetadata(currentChunk.String(), chunkIndex, uploadID, libraryID, version, source, currentTokens, headers)
 			chunks = append(chunks, chunk)
 			chunkIndex++
 			currentChunk.Reset()
@@ -314,11 +324,48 @@ func (p *DocumentProcessor) splitLargeSectionWithMetadata(text string, chunkSize
 	}
 
 	if currentChunk.Len() > 0 {
-		chunk := p.createChunkWithMetadata(currentChunk.String(), chunkIndex, documentID, libraryID, currentTokens, headers)
+		chunk := p.createChunkWithMetadata(currentChunk.String(), chunkIndex, uploadID, libraryID, version, source, currentTokens, headers)
 		chunks = append(chunks, chunk)
 	}
 
 	return chunks
+}
+
+// extractCodeBlock 提取代码块内容
+func (p *DocumentProcessor) extractCodeBlock(text string) string {
+	codeBlockRegex := regexp.MustCompile("(?s)```(?:\\w+)?\\n?(.*?)```")
+	matches := codeBlockRegex.FindAllStringSubmatch(text, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+	// 返回第一个代码块的内容
+	return strings.TrimSpace(matches[0][1])
+}
+
+// detectLanguage 检测代码语言
+func (p *DocumentProcessor) detectLanguage(text string) string {
+	// 从代码块标记中提取语言
+	langRegex := regexp.MustCompile("```(\\w+)")
+	matches := langRegex.FindStringSubmatch(text)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return "markdown"
+}
+
+// buildTitleFromHeaders 从标题层级构建标题
+func (p *DocumentProcessor) buildTitleFromHeaders(headers map[string]string) string {
+	var parts []string
+	for i := 1; i <= 6; i++ {
+		key := fmt.Sprintf("h%d", i)
+		if v, ok := headers[key]; ok && v != "" {
+			parts = append(parts, v)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " > ")
 }
 
 // splitIntoAtoms 将文本拆成原子单元（代码块完整保留，其他按段落分）
@@ -404,7 +451,7 @@ func (p *DocumentProcessor) countTokens(text string) int {
 }
 
 // ProcessDocumentAsync 异步处理文档
-func (p *DocumentProcessor) ProcessDocumentAsync(doc *dbmodel.Document, content []byte) {
+func (p *DocumentProcessor) ProcessDocumentAsync(doc *dbmodel.DocumentUpload, content []byte) {
 	go func() {
 		log.Printf("[Processor] Starting to process document: %s (ID: %d)", doc.Title, doc.ID)
 		if err := p.ProcessDocument(doc, content); err != nil {
@@ -420,7 +467,7 @@ func (p *DocumentProcessor) ProcessDocumentAsync(doc *dbmodel.Document, content 
 }
 
 // ProcessDocumentWithCallback 处理文档（带状态回调）
-func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.Document, content []byte, statusChan chan response.ProcessStatus) {
+func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpload, content []byte, statusChan chan response.ProcessStatus) {
 	defer close(statusChan)
 
 	log.Printf("[Processor] Starting to process document: %s (ID: %d)", doc.Title, doc.ID)
@@ -438,7 +485,7 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.Document, c
 
 	// 2. 分块
 	statusChan <- response.ProcessStatus{Stage: "chunking", Progress: 30, Message: "正在分块...", Status: "processing"}
-	chunks := p.chunkText(text, doc.ID, doc.LibraryID)
+	chunks := p.chunkText(text, doc.ID, doc.LibraryID, doc.Version, doc.FilePath)
 	if len(chunks) == 0 {
 		statusChan <- response.ProcessStatus{Stage: "failed", Progress: 0, Message: "分块失败：无有效内容", Status: "failed"}
 		doc.Status = "failed"
@@ -486,7 +533,7 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.Document, c
 	}
 
 	// 6. 完成 - 更新文档状态和统计
-	doc.Status = "active"
+	doc.Status = "completed"
 	doc.ChunkCount = len(chunks)
 	doc.TokenCount = totalTokens
 	if err := global.DB.Save(doc).Error; err != nil {
@@ -494,5 +541,5 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.Document, c
 	}
 
 	log.Printf("[Processor] Successfully processed document: %s (chunks: %d, tokens: %d)", doc.Title, len(chunks), totalTokens)
-	statusChan <- response.ProcessStatus{Stage: "completed", Progress: 100, Message: "处理完成", Status: "active"}
+	statusChan <- response.ProcessStatus{Stage: "completed", Progress: 100, Message: "处理完成", Status: "completed"}
 }

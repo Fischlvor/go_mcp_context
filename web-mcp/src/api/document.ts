@@ -5,6 +5,7 @@ import { uploadWithSSE, type SSEOptions, type SSEEvent } from '@/utils/sse'
 export interface Document {
   id: number
   library_id: number
+  version: string
   title: string
   file_path: string
   file_type: string
@@ -35,8 +36,8 @@ export interface ProcessStatus {
   title?: string
 }
 
-// 获取文档列表
-export const getDocuments = (params: { library_id: number; page?: number; page_size?: number }): Promise<ApiResponse<DocumentListResponse>> => {
+// 获取文档列表（支持版本过滤）
+export const getDocuments = (params: { library_id: number; version?: string; page?: number; page_size?: number }): Promise<ApiResponse<DocumentListResponse>> => {
   return service({
     url: '/documents',
     method: 'get',
@@ -45,10 +46,11 @@ export const getDocuments = (params: { library_id: number; page?: number; page_s
 }
 
 // 上传文档（普通方式）
-export const uploadDocument = (libraryId: number, file: File): Promise<ApiResponse<Document>> => {
+export const uploadDocument = (libraryId: number, file: File, version: string = 'latest'): Promise<ApiResponse<Document>> => {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('library_id', String(libraryId))
+  formData.append('version', version)
   
   return service({
     url: '/documents/upload',
@@ -68,12 +70,13 @@ export const uploadDocumentWithSSE = (
     onProgress?: (status: ProcessStatus) => void
     onComplete?: (status: ProcessStatus) => void
     onError?: (error: Error) => void
-  }
+  },
+  version: string = 'latest'
 ): Promise<void> => {
   return uploadWithSSE(
     '/documents/upload-sse',
     file,
-    { library_id: String(libraryId) },
+    { library_id: String(libraryId), version },
     {
       onMessage: (event: SSEEvent<ProcessStatus>) => {
         console.log('[SSE] Received event:', event)
@@ -112,10 +115,14 @@ export interface DocumentContent {
   content: string
 }
 
-// 获取库的最新文档内容
-export const getLatestCode = (libraryId: number): Promise<ApiResponse<DocumentContent>> => {
+// 获取库的最新文档内容（支持指定版本）
+export const getLatestCode = (libraryId: number, version?: string): Promise<ApiResponse<DocumentContent>> => {
+  const url = version 
+    ? `/documents/code/${libraryId}/${version}`
+    : `/documents/code/${libraryId}`
+  
   return service({
-    url: `/documents/code/${libraryId}`,
+    url,
     method: 'get'
   })
 }

@@ -11,12 +11,13 @@ type SearchResult struct {
 
 // SearchResultItem 搜索结果项
 type SearchResultItem struct {
-	ChunkID    uint    `json:"chunk_id"`
-	DocumentID uint    `json:"document_id"`
-	LibraryID  uint    `json:"library_id"`
-	Title      string  `json:"title"`     // 从 Metadata 取最深层级标题
-	Source     string  `json:"source"`    // Document.Title
-	Content    string  `json:"content"`   // ChunkText 原文
-	Tokens     int     `json:"tokens"`    // token 数
-	Relevance  float64 `json:"relevance"` // 最终相关性分数 0-1
+	ChunkID   uint    `json:"chunk_id"`
+	UploadID  uint    `json:"upload_id"`
+	LibraryID uint    `json:"library_id"`
+	Version   string  `json:"version"`   // 文档版本
+	Title     string  `json:"title"`     // LLM 生成的标题
+	Source    string  `json:"source"`    // 文件来源路径
+	Content   string  `json:"content"`   // ChunkText 原文
+	Tokens    int     `json:"tokens"`    // token 数
+	Relevance float64 `json:"relevance"` // 最终相关性分数 0-1
 }

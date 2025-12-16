@@ -12,6 +12,9 @@ export interface User {
 // 用户状态
 const user = ref<User | null>(null)
 
+// 初始化标记，确保只初始化一次
+let initPromise: Promise<void> | null = null
+
 // 是否已登录
 export const isLoggedIn = computed(() => user.value !== null && accessToken.value !== null)
 
@@ -51,16 +54,27 @@ export async function logout() {
   user.value = null
   clearAccessToken()
   localStorage.removeItem('user')
+  initPromise = null // 重置初始化标记
 }
 
 // 初始化：从 localStorage 恢复用户状态，并从 SSO 获取最新用户信息
 export async function initUserState() {
-  initAccessToken()
-  
-  if (accessToken.value) {
-    // 从 SSO 获取最新用户信息
-    await fetchUserInfo()
+  // 如果已经在初始化中，等待初始化完成
+  if (initPromise) {
+    return initPromise
   }
+  
+  // 创建初始化 Promise
+  initPromise = (async () => {
+    initAccessToken()
+    
+    if (accessToken.value) {
+      // 从 SSO 获取最新用户信息
+      await fetchUserInfo()
+    }
+  })()
+  
+  return initPromise
 }
 
 // 从后端获取用户信息

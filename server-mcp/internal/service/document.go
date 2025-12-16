@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -20,29 +21,22 @@ import (
 
 type DocumentService struct{}
 
-// List 获取文档列表
+// List 获取文档上传记录列表
 func (s *DocumentService) List(req *request.DocumentList) (*response.PageResult, error) {
-	var documents []dbmodel.Document
+	var documents []dbmodel.DocumentUpload
 	var total int64
 
-	db := global.DB.Model(&dbmodel.Document{})
+	db := global.DB.Model(&dbmodel.DocumentUpload{})
 
 	// 条件过滤
 	if req.LibraryID != nil && *req.LibraryID > 0 {
 		db = db.Where("library_id = ?", *req.LibraryID)
 	}
-	if req.Title != nil && *req.Title != "" {
-		db = db.Where("title LIKE ?", "%"+*req.Title+"%")
+	if req.Version != nil && *req.Version != "" {
+		db = db.Where("version = ?", *req.Version)
 	}
-	if req.FileType != nil && *req.FileType != "" {
-		db = db.Where("file_type = ?", *req.FileType)
-	}
-	if req.Status != nil && *req.Status != "" {
-		db = db.Where("status = ?", *req.Status)
-	} else {
-		// 默认查询非删除状态的文档
-		db = db.Where("status != ?", "deleted")
-	}
+	// 默认查询非删除状态的文档
+	db = db.Where("status != ?", "deleted")
 
 	// 计算总数
 	if err := db.Count(&total).Error; err != nil {
@@ -73,7 +67,7 @@ func (s *DocumentService) List(req *request.DocumentList) (*response.PageResult,
 }
 
 // Upload 上传文档
-func (s *DocumentService) Upload(libraryID uint, file multipart.File, header *multipart.FileHeader) (*dbmodel.Document, error) {
+func (s *DocumentService) Upload(libraryID uint, version string, file multipart.File, header *multipart.FileHeader) (*dbmodel.DocumentUpload, error) {
 	// 检查库是否存在
 	var library dbmodel.Library
 	if err := global.DB.First(&library, libraryID).Error; err != nil {
@@ -91,9 +85,9 @@ func (s *DocumentService) Upload(libraryID uint, file multipart.File, header *mu
 	contentHash := hex.EncodeToString(hash[:])
 
 	// 检查是否已存在相同内容的文档
-	var existingDoc dbmodel.Document
-	if err := global.DB.Where("library_id = ? AND content_hash = ? AND status = ?",
-		libraryID, contentHash, "active").First(&existingDoc).Error; err == nil {
+	var existingDoc dbmodel.DocumentUpload
+	if err := global.DB.Where("library_id = ? AND version = ? AND content_hash = ? AND status != ?",
+		libraryID, version, contentHash, "deleted").First(&existingDoc).Error; err == nil {
 		return nil, ErrAlreadyExists
 	}
 
@@ -104,35 +98,39 @@ func (s *DocumentService) Upload(libraryID uint, file multipart.File, header *mu
 		return nil, ErrInvalidParams
 	}
 
-	// 生成存储路径: uploads/documents/{lib_name}_{version}/
-	dirName := sanitizeFileName(fmt.Sprintf("%s_%s", library.Name, library.Version))
-	uploadDir := filepath.Join("uploads", "documents", dirName)
+	// 生成存储 Key: {path_prefix}/{lib_name}/{version}/{filename}
+	libDir := sanitizeFileName(library.Name)
+	versionDir := sanitizeFileName(version)
+	key := filepath.Join(global.Config.Qiniu.PathPrefix, libDir, versionDir, header.Filename)
 
-	// 创建目录
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create upload directory: %w", err)
+	// 根据存储类型上传文件
+	storageType := global.Config.System.StorageType
+	if storageType == "" {
+		storageType = "local"
 	}
 
-	// 保存文件
-	filePath := filepath.Join(uploadDir, header.Filename)
-	if err := os.WriteFile(filePath, content, 0644); err != nil {
-		return nil, fmt.Errorf("failed to save file: %w", err)
+	// 使用 Storage 接口上传
+	result, err := global.Storage.Upload(context.Background(), key, file, header.Size, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
 
-	// 创建文档记录（初始状态为 processing）
-	doc := &dbmodel.Document{
+	// 创建文档上传记录（初始状态为 processing）
+	doc := &dbmodel.DocumentUpload{
 		LibraryID:   libraryID,
+		Version:     version,
 		Title:       header.Filename,
-		FilePath:    filePath,
+		FilePath:    result.Key,
 		FileType:    fileType,
 		FileSize:    int64(len(content)),
 		ContentHash: contentHash,
 		Status:      "processing",
+		StorageType: storageType,
 	}
 
 	if err := global.DB.Create(doc).Error; err != nil {
-		// 如果数据库创建失败，删除已保存的文件
-		os.Remove(filePath)
+		// 如果数据库创建失败，删除已上传的文件
+		global.Storage.Delete(context.Background(), result.Key)
 		return nil, err
 	}
 
@@ -144,7 +142,7 @@ func (s *DocumentService) Upload(libraryID uint, file multipart.File, header *mu
 }
 
 // UploadWithCallback 上传文档（带状态回调）
-func (s *DocumentService) UploadWithCallback(libraryID uint, file multipart.File, header *multipart.FileHeader, statusChan chan response.ProcessStatus) (*dbmodel.Document, error) {
+func (s *DocumentService) UploadWithCallback(libraryID uint, version string, file multipart.File, header *multipart.FileHeader, statusChan chan response.ProcessStatus) (*dbmodel.DocumentUpload, error) {
 	// 检查库是否存在
 	var library dbmodel.Library
 	if err := global.DB.First(&library, libraryID).Error; err != nil {
@@ -164,9 +162,9 @@ func (s *DocumentService) UploadWithCallback(libraryID uint, file multipart.File
 	contentHash := hex.EncodeToString(hash[:])
 
 	// 检查是否已存在相同内容的文档
-	var existingDoc dbmodel.Document
-	if err := global.DB.Where("library_id = ? AND content_hash = ? AND status != ?",
-		libraryID, contentHash, "deleted").First(&existingDoc).Error; err == nil {
+	var existingDoc dbmodel.DocumentUpload
+	if err := global.DB.Where("library_id = ? AND version = ? AND content_hash = ? AND status != ?",
+		libraryID, version, contentHash, "deleted").First(&existingDoc).Error; err == nil {
 		close(statusChan)
 		return nil, ErrAlreadyExists
 	}
@@ -179,34 +177,39 @@ func (s *DocumentService) UploadWithCallback(libraryID uint, file multipart.File
 		return nil, ErrInvalidParams
 	}
 
-	// 生成存储路径
-	dirName := sanitizeFileName(fmt.Sprintf("%s_%s", library.Name, library.Version))
-	uploadDir := filepath.Join("uploads", "documents", dirName)
+	// 生成存储 Key: {path_prefix}/{lib_name}/{version}/{filename}
+	libDir := sanitizeFileName(library.Name)
+	versionDir := sanitizeFileName(version)
+	key := filepath.Join(global.Config.Qiniu.PathPrefix, libDir, versionDir, header.Filename)
 
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		close(statusChan)
-		return nil, fmt.Errorf("failed to create upload directory: %w", err)
+	// 根据存储类型上传文件
+	storageType := global.Config.System.StorageType
+	if storageType == "" {
+		storageType = "local"
 	}
 
-	filePath := filepath.Join(uploadDir, header.Filename)
-	if err := os.WriteFile(filePath, content, 0644); err != nil {
+	// 使用 Storage 接口上传
+	result, err := global.Storage.Upload(context.Background(), key, file, header.Size, "")
+	if err != nil {
 		close(statusChan)
-		return nil, fmt.Errorf("failed to save file: %w", err)
+		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
 
-	// 创建文档记录
-	doc := &dbmodel.Document{
+	// 创建文档上传记录
+	doc := &dbmodel.DocumentUpload{
 		LibraryID:   libraryID,
+		Version:     version,
 		Title:       header.Filename,
-		FilePath:    filePath,
+		FilePath:    result.Key,
 		FileType:    fileType,
 		FileSize:    int64(len(content)),
 		ContentHash: contentHash,
 		Status:      "processing",
+		StorageType: storageType,
 	}
 
 	if err := global.DB.Create(doc).Error; err != nil {
-		os.Remove(filePath)
+		global.Storage.Delete(context.Background(), result.Key)
 		close(statusChan)
 		return nil, err
 	}
@@ -229,9 +232,9 @@ func sanitizeFileName(name string) string {
 	return strings.ToLower(name)
 }
 
-// GetByID 根据 ID 获取文档
-func (s *DocumentService) GetByID(id uint) (*dbmodel.Document, error) {
-	var doc dbmodel.Document
+// GetByID 根据 ID 获取文档上传记录
+func (s *DocumentService) GetByID(id uint) (*dbmodel.DocumentUpload, error) {
+	var doc dbmodel.DocumentUpload
 	if err := global.DB.First(&doc, id).Error; err != nil {
 		return nil, ErrNotFound
 	}
@@ -240,8 +243,8 @@ func (s *DocumentService) GetByID(id uint) (*dbmodel.Document, error) {
 
 // GetLatestContent 获取库的最新文档内容（按创建时间倒序）
 func (s *DocumentService) GetLatestContent(libraryID uint) (string, string, error) {
-	var doc dbmodel.Document
-	if err := global.DB.Where("library_id = ? AND status = ?", libraryID, "active").
+	var doc dbmodel.DocumentUpload
+	if err := global.DB.Where("library_id = ? AND status = ?", libraryID, "completed").
 		Order("created_at DESC").First(&doc).Error; err != nil {
 		return "", "", ErrNotFound
 	}
@@ -255,10 +258,10 @@ func (s *DocumentService) GetLatestContent(libraryID uint) (string, string, erro
 	return doc.Title, string(content), nil
 }
 
-// Delete 删除文档（软删除）
+// Delete 删除文档上传记录（软删除）
 func (s *DocumentService) Delete(id uint) error {
 	now := time.Now()
-	result := global.DB.Model(&dbmodel.Document{}).
+	result := global.DB.Model(&dbmodel.DocumentUpload{}).
 		Where("id = ? AND deleted_at IS NULL", id).
 		Updates(map[string]interface{}{"status": "deleted", "deleted_at": now})
 
@@ -272,7 +275,7 @@ func (s *DocumentService) Delete(id uint) error {
 
 	// 同时删除关联的 chunks
 	global.DB.Model(&dbmodel.DocumentChunk{}).
-		Where("document_id = ? AND deleted_at IS NULL", id).
+		Where("upload_id = ? AND deleted_at IS NULL", id).
 		Updates(map[string]interface{}{"status": "deleted", "deleted_at": now})
 
 	return nil

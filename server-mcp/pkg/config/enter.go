@@ -6,6 +6,8 @@ type Config struct {
 	Postgres  Postgres  `json:"postgres" yaml:"postgres"`
 	Redis     Redis     `json:"redis" yaml:"redis"`
 	Embedding Embedding `json:"embedding" yaml:"embedding"`
+	LLM       LLM       `json:"llm" yaml:"llm"`
+	Qiniu     Qiniu     `json:"qiniu" yaml:"qiniu"`
 	Chunker   Chunker   `json:"chunker" yaml:"chunker"`
 	Cache     Cache     `json:"cache" yaml:"cache"`
 	JWT       JWT       `json:"jwt" yaml:"jwt"`

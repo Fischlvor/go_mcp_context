@@ -17,6 +17,8 @@ func main() {
 	global.DB = initialize.InitGorm()
 	global.Redis = initialize.ConnectRedis()
 	global.Embedding = initialize.InitEmbedding()
+	initialize.InitStorage() // 初始化存储服务
+	initialize.InitLLM()     // 初始化 LLM 服务
 
 	// 加载 SSO 公钥
 	if err := middleware.LoadSSOPublicKey(global.Config.SSO.PublicKeyPath); err != nil {
