@@ -26,7 +26,7 @@ const routes = [
     meta: { title: 'Library Admin' }
   },
   {
-    path: '/libraries/:id/:title',
+    path: '/libraries/:id/:version/:title',
     name: 'library-document',
     component: () => import('@/views/library/detail.vue'),
     meta: { title: 'Document' }

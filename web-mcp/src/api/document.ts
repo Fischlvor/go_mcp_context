@@ -36,8 +36,8 @@ export interface ProcessStatus {
   title?: string
 }
 
-// 获取文档列表
-export const getDocuments = (params: { library_id: number; page?: number; page_size?: number }): Promise<ApiResponse<DocumentListResponse>> => {
+// 获取文档列表（支持版本过滤）
+export const getDocuments = (params: { library_id: number; version?: string; page?: number; page_size?: number }): Promise<ApiResponse<DocumentListResponse>> => {
   return service({
     url: '/documents',
     method: 'get',
@@ -115,10 +115,14 @@ export interface DocumentContent {
   content: string
 }
 
-// 获取库的最新文档内容
-export const getLatestCode = (libraryId: number): Promise<ApiResponse<DocumentContent>> => {
+// 获取库的最新文档内容（支持指定版本）
+export const getLatestCode = (libraryId: number, version?: string): Promise<ApiResponse<DocumentContent>> => {
+  const url = version 
+    ? `/documents/code/${libraryId}/${version}`
+    : `/documents/code/${libraryId}`
+  
   return service({
-    url: `/documents/code/${libraryId}`,
+    url,
     method: 'get'
   })
 }
