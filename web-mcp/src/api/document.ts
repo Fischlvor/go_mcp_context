@@ -1,7 +1,12 @@
 import service from '@/utils/request'
 import type { ApiResponse } from '@/utils/request'
-import { uploadWithSSE, type SSEOptions, type SSEEvent } from '@/utils/sse'
+import { uploadWithSSE, type SSEEvent } from '@/utils/sse'
 
+// ============================================================
+// 类型定义
+// ============================================================
+
+// 文档上传记录
 export interface Document {
   id: number
   library_id: number
@@ -18,11 +23,44 @@ export interface Document {
   updated_at: string
 }
 
+// 文档列表响应
 export interface DocumentListResponse {
   list: Document[]
   total: number
   page: number
   page_size: number
+}
+
+// 文档块
+export interface DocumentChunk {
+  id: number
+  library_id: number
+  upload_id: number
+  version: string
+  chunk_index: number
+  title: string
+  description: string
+  source: string
+  language: string
+  code: string
+  chunk_text: string
+  tokens: number
+  chunk_type: 'code' | 'info' | 'mixed'
+  access_count: number
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+// 文档块响应
+export interface ChunksResponse {
+  chunks: DocumentChunk[]
+}
+
+// 文档内容（合并后）
+export interface DocumentContent {
+  title: string
+  content: string
 }
 
 // 处理状态（SSE 推送）
@@ -36,13 +74,93 @@ export interface ProcessStatus {
   title?: string
 }
 
+// ============================================================
+// 常量
+// ============================================================
+
+// 块分隔符
+const CHUNK_SEPARATOR = '\n\n--------------------------------\n\n'
+
+// ============================================================
+// API 请求
+// ============================================================
+
 // 获取文档列表（支持版本过滤）
-export const getDocuments = (params: { library_id: number; version?: string; page?: number; page_size?: number }): Promise<ApiResponse<DocumentListResponse>> => {
+export const getDocuments = (params: { 
+  library_id: number
+  version?: string
+  page?: number
+  page_size?: number 
+}): Promise<DocumentListResponse> => {
   return service({
-    url: '/documents',
+    url: '/documents/list',
     method: 'get',
     params
   })
+}
+
+// 获取文档详情
+export const getDocument = (id: number): Promise<ApiResponse<Document>> => {
+  return service({
+    url: `/documents/detail/${id}`,
+    method: 'get'
+  })
+}
+
+// 获取库的文档块
+// mode: 'code' 返回代码块, 'info' 返回文档块
+export const getChunks = (mode: 'code' | 'info', libraryId: number, version?: string): Promise<ChunksResponse> => {
+  const url = version 
+    ? `/documents/chunks/${mode}/${libraryId}/${version}`
+    : `/documents/chunks/${mode}/${libraryId}`
+  
+  return service({
+    url,
+    method: 'get'
+  })
+}
+
+// 格式化单个代码块（code 模式）
+const formatCodeChunk = (chunk: DocumentChunk): string => {
+  const parts: string[] = []
+  if (chunk.title) parts.push(`### ${chunk.title}`)
+  if (chunk.source) parts.push(`Source: ${chunk.source}`)
+  if (chunk.description) parts.push(chunk.description)
+  // 优先使用 code 字段，否则使用 chunk_text
+  const content = chunk.code || chunk.chunk_text
+  if (content) {
+    const lang = chunk.language || ''
+    parts.push(`\`\`\`${lang}\n${content}\n\`\`\``)
+  }
+  return parts.join('\n\n')
+}
+
+// 格式化单个信息块（info 模式）
+const formatInfoChunk = (chunk: DocumentChunk): string => {
+  const parts: string[] = []
+  if (chunk.title) parts.push(`### ${chunk.title}`)
+  if (chunk.source) parts.push(`Source: ${chunk.source}`)
+  if (chunk.description) parts.push(chunk.description)
+  if (chunk.chunk_text) parts.push(chunk.chunk_text)
+  return parts.join('\n\n')
+}
+
+// 获取代码块内容（合并后）
+export const getLatestCode = async (libraryId: number, version?: string): Promise<DocumentContent> => {
+  const res = await getChunks('code', libraryId, version)
+  const chunks = res.chunks || []
+  const content = chunks.map(formatCodeChunk).join(CHUNK_SEPARATOR)
+  const title = chunks.length > 0 ? chunks[0].title : ''
+  return { title, content }
+}
+
+// 获取文档信息块内容（合并后）
+export const getLatestInfo = async (libraryId: number, version?: string): Promise<DocumentContent> => {
+  const res = await getChunks('info', libraryId, version)
+  const chunks = res.chunks || []
+  const content = chunks.map(formatInfoChunk).join(CHUNK_SEPARATOR)
+  const title = chunks.length > 0 ? chunks[0].title : ''
+  return { title, content }
 }
 
 // 上传文档（普通方式）
@@ -87,7 +205,6 @@ export const uploadDocumentWithSSE = (
         } else if (stage === 'failed' || stage === 'error') {
           callbacks.onError?.(new Error(event.data.message || 'Processing failed'))
         } else {
-          // 处理所有进度事件（uploaded, parsing, chunking, embedding, saving）
           callbacks.onProgress?.({
             ...event.data,
             stage: stage as ProcessStatus['stage'],
@@ -100,31 +217,6 @@ export const uploadDocumentWithSSE = (
       onError: callbacks.onError,
     }
   )
-}
-
-// 获取文档详情
-export const getDocument = (id: number): Promise<ApiResponse<Document>> => {
-  return service({
-    url: `/documents/${id}`,
-    method: 'get'
-  })
-}
-
-export interface DocumentContent {
-  title: string
-  content: string
-}
-
-// 获取库的最新文档内容（支持指定版本）
-export const getLatestCode = (libraryId: number, version?: string): Promise<ApiResponse<DocumentContent>> => {
-  const url = version 
-    ? `/documents/code/${libraryId}/${version}`
-    : `/documents/code/${libraryId}`
-  
-  return service({
-    url,
-    method: 'get'
-  })
 }
 
 // 删除文档

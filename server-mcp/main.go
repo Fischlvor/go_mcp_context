@@ -1,6 +1,9 @@
 package main
 
 import (
+	"net/http"
+	"os"
+
 	"go-mcp-context/internal/initialize"
 	"go-mcp-context/internal/middleware"
 	"go-mcp-context/pkg/core"
@@ -9,6 +12,19 @@ import (
 
 	"go.uber.org/zap"
 )
+
+func init() {
+	// 禁用系统代理
+	os.Unsetenv("HTTP_PROXY")
+	os.Unsetenv("HTTPS_PROXY")
+	os.Unsetenv("http_proxy")
+	os.Unsetenv("https_proxy")
+	os.Unsetenv("ALL_PROXY")
+	os.Unsetenv("all_proxy")
+
+	// 禁用 Go 默认 HTTP 客户端的代理
+	http.DefaultTransport.(*http.Transport).Proxy = nil
+}
 
 func main() {
 	global.Config = core.InitConf()

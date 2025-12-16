@@ -104,9 +104,7 @@ const searchForm = reactive({
 
 const fetchLibraries = async () => {
   const res = await getLibraries({ page: 1, page_size: 100 })
-  if (res.code === 0) {
-    libraries.value = res.data.list
-  }
+  libraries.value = res.list
 }
 
 const handleSearch = async () => {
@@ -131,10 +129,8 @@ const handleSearch = async () => {
       limit: searchForm.limit
     })
     
-    if (res.code === 0) {
-      results.value = res.data.results
-      total.value = res.data.total
-    }
+    results.value = res.results
+    total.value = res.total
   } finally {
     loading.value = false
   }

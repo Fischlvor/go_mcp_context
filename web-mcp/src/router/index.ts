@@ -26,10 +26,10 @@ const routes = [
     meta: { title: 'Library Admin' }
   },
   {
-    path: '/libraries/:id/:version/:title',
-    name: 'library-document',
+    path: '/libraries/:id/:version',
+    name: 'library-version',
     component: () => import('@/views/library/detail.vue'),
-    meta: { title: 'Document' }
+    meta: { title: 'Library Version' }
   },
   {
     path: '/search',
