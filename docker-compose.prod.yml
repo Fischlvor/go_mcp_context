@@ -19,7 +19,7 @@ services:
       - infrastructure-network
       - blog-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8090/api/v1/base/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8090/api/base/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -37,6 +37,12 @@ services:
       - blog-network
     depends_on:
       - server-mcp
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 networks:
   mcp-network:

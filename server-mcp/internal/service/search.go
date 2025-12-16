@@ -90,14 +90,15 @@ func (s *SearchService) SearchDocuments(req *request.Search) (*response.SearchRe
 	results := make([]response.SearchResultItem, 0, end-start)
 	for _, c := range candidates[start:end] {
 		results = append(results, response.SearchResultItem{
-			ChunkID:    c.Chunk.ID,
-			DocumentID: c.Chunk.DocumentID,
-			LibraryID:  c.Chunk.LibraryID,
-			Title:      extractDeepestTitle(c.Chunk.Metadata),
-			Source:     c.DocTitle,
-			Content:    c.Chunk.ChunkText,
-			Tokens:     c.Chunk.Tokens,
-			Relevance:  c.FinalScore,
+			ChunkID:   c.Chunk.ID,
+			UploadID:  c.Chunk.UploadID,
+			LibraryID: c.Chunk.LibraryID,
+			Version:   c.Chunk.Version,
+			Title:     c.Chunk.Title, // 使用 chunk 自带的 title
+			Source:    c.Chunk.Source,
+			Content:   c.Chunk.ChunkText,
+			Tokens:    c.Chunk.Tokens,
+			Relevance: c.FinalScore,
 		})
 	}
 

@@ -41,6 +41,11 @@ func (d *DocumentApi) Upload(c *gin.Context) {
 		return
 	}
 
+	version := c.PostForm("version")
+	if version == "" {
+		version = "latest" // 默认版本
+	}
+
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		response.FailWithMessage("未上传文件", c)
@@ -48,7 +53,7 @@ func (d *DocumentApi) Upload(c *gin.Context) {
 	}
 	defer file.Close()
 
-	doc, err := documentService.Upload(uint(libraryID), file, header)
+	doc, err := documentService.Upload(uint(libraryID), version, file, header)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.FailWithMessage("库不存在", c)
@@ -99,6 +104,11 @@ func (d *DocumentApi) UploadWithSSE(c *gin.Context) {
 		return
 	}
 
+	version := c.PostForm("version")
+	if version == "" {
+		version = "latest" // 默认版本
+	}
+
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		sendEvent("error", map[string]string{"message": "未上传文件"})
@@ -110,7 +120,7 @@ func (d *DocumentApi) UploadWithSSE(c *gin.Context) {
 	statusChan := make(chan response.ProcessStatus, 10)
 
 	// 上传文档（带状态回调）
-	doc, err := documentService.UploadWithCallback(uint(libraryID), file, header, statusChan)
+	doc, err := documentService.UploadWithCallback(uint(libraryID), version, file, header, statusChan)
 	if err != nil {
 		errMsg := "上传失败"
 		if errors.Is(err, service.ErrNotFound) {

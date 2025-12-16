@@ -12,8 +12,8 @@ import (
 
 // InitRouter 初始化路由
 func InitRouter() *gin.Engine {
-	r := gin.New()
-	r.Use(middleware.GinLogger(), middleware.GinRecovery(true))
+	// gin.Default() 已包含 Logger 和 Recovery 中间件
+	r := gin.Default()
 
 	// 初始化 Session 中间件（用于存储 refresh_token）
 	store := cookie.NewStore([]byte(global.Config.SSO.SessionsSecret))

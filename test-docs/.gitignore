@@ -1,0 +1,4 @@
+# 忽略所有下载的文档目录，只保留脚本
+*
+!.gitignore
+!download.sh

@@ -34,7 +34,7 @@ FROM alpine:latest
 
 # 使用国内镜像源加速,安装运行时依赖并清理,同时创建必要的目录
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
-    apk --no-cache add ca-certificates tzdata && \
+    apk --no-cache add ca-certificates tzdata wget && \
     rm -rf /var/cache/apk/* /tmp/* /var/tmp/* && \
     mkdir -p /app/configs /app/uploads /app/logs /app/keys
 

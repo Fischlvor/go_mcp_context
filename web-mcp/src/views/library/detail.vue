@@ -22,26 +22,55 @@
                   <h2 class="flex items-center gap-2 text-xl font-semibold leading-[100%] tracking-[0%] text-stone-800">
                     {{ library.name }}
                   </h2>
+                  <!-- 源链接或 Local -->
                   <div class="w-fit max-w-full">
-                    <span class="block overflow-hidden text-ellipsis whitespace-nowrap text-base font-normal leading-normal text-stone-500">
-                      Version: {{ library.version }}
+                    <a 
+                      v-if="library.source_type === 'github' && library.source_url"
+                      :href="`https://github.com/${library.source_url}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="block overflow-hidden text-ellipsis whitespace-nowrap text-base font-normal leading-normal text-stone-500 underline decoration-solid decoration-from-font hover:text-stone-700"
+                      :title="`https://github.com/${library.source_url}`"
+                    >
+                      https://github.com/{{ library.source_url }}
+                    </a>
+                    <span 
+                      v-else
+                      class="block overflow-hidden text-ellipsis whitespace-nowrap text-base font-normal leading-normal text-stone-500"
+                    >
+                      Local
                     </span>
                   </div>
+                  <!-- 可展开的描述 -->
                   <h3 class="text-base font-normal leading-[140%] text-stone-500">
-                    {{ library.description || 'No description' }}
+                    <span v-if="!expandDescription && isTruncated(library.description)" class="inline-flex items-center gap-0">
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ getTruncatedText(library.description) }}</span><span 
+                        class="cursor-pointer text-emerald-600 hover:text-emerald-700 hover:underline flex-shrink-0"
+                        @click="expandDescription = true"
+                      >...</span>
+                    </span>
+                    <span v-else-if="expandDescription">
+                      {{ library.description || 'No description' }}<span 
+                        class="cursor-pointer text-emerald-600 hover:text-emerald-700 hover:underline"
+                        @click="expandDescription = false"
+                      > collapse</span>
+                    </span>
+                    <span v-else>
+                      {{ library.description || 'No description' }}
+                    </span>
                   </h3>
                 </div>
                 <!-- Manage 按钮 -->
                 <div class="relative inline-flex">
                   <router-link 
                     :to="`/libraries/${libraryId}/admin`"
-                    class="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-stone-300 text-base text-stone-500 transition hover:border-stone-400 px-3 py-2"
+                    class="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-stone-300 text-base text-stone-500 transition hover:border-stone-400 px-3 py-2 !border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-stone-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-emerald-600">
                       <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"></path>
                       <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
                     </svg>
-                    <span>Manage</span>
+                    <span class="text-emerald-600">Manage</span>
                   </router-link>
                 </div>
               </div>
@@ -50,23 +79,25 @@
               <div class="flex flex-col-reverse gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                 <div class="flex flex-wrap gap-2 text-sm sm:gap-1">
                   <div class="flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-emerald-800">
-                      <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
-                      <path d="M9 12l2 2l4 -4"></path>
-                    </svg>
-                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-emerald-800">{{ library.status === 'active' ? 'Active' : library.status }}</span>
+                    <div class="flex h-5 w-5 items-center justify-center text-emerald-800">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tabler-icon tabler-icon-circle-check">
+                        <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>
+                        <path d="M9 12l2 2l4 -4"></path>
+                      </svg>
+                    </div>
+                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-emerald-800">{{ library.status === 'active' ? 'Completed' : library.status }}</span>
                   </div>
                   <div class="flex items-center gap-1 rounded-md bg-stone-100 px-3 py-1.5">
                     <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-500">Tokens:</span>
-                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatNumber(library.token_count || 0) }}</span>
+                    <span class="font-variant-numeric-zero:slashed-zero text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatNumber(library.token_count || 0) }}</span>
                   </div>
                   <div class="flex items-center gap-1 rounded-md bg-stone-100 px-3 py-1.5">
                     <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-500">Documents:</span>
-                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatNumber(library.document_count || 0) }}</span>
+                    <span class="font-variant-numeric-zero:slashed-zero text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatNumber(library.document_count || 0) }}</span>
                   </div>
                   <div class="flex items-center gap-1 rounded-md bg-stone-100 px-3 py-1.5">
                     <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-500">Update:</span>
-                    <span class="text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatDate(library.updated_at) }}</span>
+                    <span class="font-variant-numeric-zero:slashed-zero text-sm font-normal leading-[100%] tracking-[0%] text-stone-800">{{ formatDate(library.updated_at) }}</span>
                   </div>
                 </div>
               </div>
@@ -94,6 +125,23 @@
                       <path d="M12 12l-8 -4.5"></path>
                     </svg>
                     Context
+                  </button>
+                  <button 
+                    :class="[
+                      '-mb-px flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-base font-medium',
+                      activeTab === 'documents' 
+                        ? 'relative z-10 border border-stone-300 border-b-stone-50 bg-stone-50 text-stone-800' 
+                        : 'border border-stone-300 border-b-transparent text-stone-500 hover:border-stone-400 hover:text-stone-600'
+                    ]"
+                    @click="activeTab = 'documents'"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                      <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                      <path d="M9 17h6"></path>
+                      <path d="M9 13h6"></path>
+                    </svg>
+                    Documents
                   </button>
                 </div>
               </div>
@@ -230,6 +278,91 @@
               </div>
             </div>
           </div>
+
+          <!-- Documents Tab 内容 -->
+          <div v-if="activeTab === 'documents'" class="mt-8">
+            <div class="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+              <div class="space-y-6">
+                <!-- 标题 -->
+                <div>
+                  <h3 class="text-base font-semibold text-stone-800">Documents</h3>
+                  <p class="mt-1 text-sm text-stone-500">
+                    {{ version ? `Documents in version ${version}` : 'All documents' }}
+                  </p>
+                </div>
+
+                <!-- 文档列表表格 -->
+                <div class="w-full overflow-x-auto md:overflow-x-visible">
+                  <table class="w-full min-w-[600px] table-fixed border-b border-stone-200">
+                    <thead class="border-b border-stone-200">
+                      <tr>
+                        <th class="w-[240px] px-2 py-3 text-left text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Title</th>
+                        <th class="w-[120px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Tokens</th>
+                        <th class="w-[120px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Snippets</th>
+                        <th class="w-[160px] px-2 py-3 text-right text-sm font-normal uppercase leading-none text-stone-400 sm:px-4">Last Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-200">
+                      <!-- 空状态 -->
+                      <tr v-if="documents.length === 0 && !loadingDocs">
+                        <td colspan="4" class="py-12 text-center">
+                          <div class="flex flex-col items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-stone-300">
+                              <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                              <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                            </svg>
+                            <p class="text-sm font-medium text-stone-500">No documents</p>
+                          </div>
+                        </td>
+                      </tr>
+                      <!-- 文档行 -->
+                      <tr v-for="doc in documents" :key="doc.id" class="group transition-colors hover:bg-white">
+                        <td class="h-11 px-2 align-middle sm:px-4">
+                          <div class="flex items-center gap-2 text-base font-normal leading-tight text-stone-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0">
+                              <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                              <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                            </svg>
+                            <span class="truncate">{{ doc.title }}</span>
+                          </div>
+                        </td>
+                        <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatNumber(doc.token_count || 0) }}
+                        </td>
+                        <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatNumber(doc.chunk_count || 0) }}
+                        </td>
+                        <td class="h-11 px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
+                          {{ formatDateShort(doc.updated_at) }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- 分页 -->
+                <div v-if="totalDocs > pageSize" class="flex items-center justify-between border-t border-stone-200 pt-4">
+                  <span class="text-sm text-stone-500">{{ totalDocs }} documents</span>
+                  <div class="flex gap-2">
+                    <button 
+                      class="h-8 px-3 rounded-lg border border-stone-300 text-sm text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                      :disabled="page === 1"
+                      @click="page--; fetchDocumentsList()"
+                    >
+                      Previous
+                    </button>
+                    <button 
+                      class="h-8 px-3 rounded-lg border border-stone-300 text-sm text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                      :disabled="page * pageSize >= totalDocs"
+                      @click="page++; fetchDocumentsList()"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -246,7 +379,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
 import { getLibrary } from '@/api/library'
-import { getLatestCode } from '@/api/document'
+import { getLatestCode, getDocuments } from '@/api/document'
 import { searchDocuments } from '@/api/search'
 import type { Library } from '@/api/library'
 import type { SearchResultItem } from '@/api/search'
@@ -255,11 +388,21 @@ const route = useRoute()
 const { isLoggedIn, userEmail, userPlan, initUserState, redirectToSSO } = useUser()
 
 const libraryId = computed(() => Number(route.params.id))
-const documentTitle = computed(() => route.params.title as string | undefined)
+const version = computed(() => {
+  // 只有在 /libraries/:id/:version/:title 时才有版本
+  return route.params.version as string | undefined
+})
+const documentTitle = computed(() => {
+  // 只有在 /libraries/:id/:version/:title 时才有 title
+  return route.params.title as string | undefined
+})
 const library = ref<Library>({
   id: 0,
   name: '',
-  version: '',
+  default_version: '',
+  versions: [],
+  source_type: '',
+  source_url: '',
   description: '',
   status: '',
   document_count: 0,
@@ -278,6 +421,14 @@ const searchResults = ref<SearchResultItem[]>([])
 const hasSearched = ref(false)
 const currentDocTitle = ref('')
 const loadingDoc = ref(false)
+const expandDescription = ref(false)
+
+// Documents tab
+const documents = ref<any[]>([])
+const loadingDocs = ref(false)
+const page = ref(1)
+const pageSize = ref(10)
+const totalDocs = ref(0)
 
 const handleSignIn = () => {
   redirectToSSO()
@@ -296,8 +447,8 @@ const fetchDocument = async () => {
   searchResult.value = 'Loading document...'
   
   try {
-    // 直接调用新接口获取最新文档内容
-    const res = await getLatestCode(libraryId.value)
+    // 获取指定版本的最新文档内容（如果指定了版本）
+    const res = await getLatestCode(libraryId.value, version.value)
     if (res.code === 0) {
       currentDocTitle.value = res.data.title
       searchResult.value = res.data.content || 'No content available.'
@@ -308,6 +459,27 @@ const fetchDocument = async () => {
     searchResult.value = 'Failed to load document.'
   } finally {
     loadingDoc.value = false
+  }
+}
+
+// 加载文档列表
+const fetchDocumentsList = async () => {
+  loadingDocs.value = true
+  try {
+    const res = await getDocuments({
+      library_id: libraryId.value,
+      version: version.value,
+      page: page.value,
+      page_size: pageSize.value
+    })
+    if (res.code === 0) {
+      documents.value = res.data.list || []
+      totalDocs.value = res.data.total
+    }
+  } catch (error) {
+    console.error('Failed to fetch documents:', error)
+  } finally {
+    loadingDocs.value = false
   }
 }
 
@@ -369,25 +541,66 @@ const formatNumber = (num: number) => {
   return num.toString()
 }
 
+const formatDateShort = (dateStr: string) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   
-  if (days === 0) return 'today'
-  if (days === 1) return '1 day ago'
-  if (days < 7) return `${days} days ago`
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`
-  if (days < 365) return `${Math.floor(days / 30)} months ago`
-  return `${Math.floor(days / 365)} years ago`
+  // 如果时间戳无效或是未来时间，显示 'now'
+  if (isNaN(date.getTime()) || date > now) {
+    return 'now'
+  }
+  
+  const diff = now.getTime() - date.getTime()
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  const years = Math.floor(days / 365)
+  
+  // Context7 风格：简洁的数字 + 时间单位
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''}`
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''}`
+  if (days < 7) return `${days} day${days > 1 ? 's' : ''}`
+  if (weeks < 4) return `${weeks} week${weeks > 1 ? 's' : ''}`
+  if (months < 12) return `${months} month${months > 1 ? 's' : ''}`
+  return `${years} year${years > 1 ? 's' : ''}`
+}
+
+// 检查描述是否需要截断（超过150个字符）
+const isTruncated = (text: string | undefined) => {
+  if (!text) return false
+  return text.length > 70
+}
+
+// 获取截断的文本
+const getTruncatedText = (text: string | undefined) => {
+  if (!text) return 'No description'
+  if (text.length > 70) {
+    return text.substring(0, 70)
+  }
+  return text
 }
 
 onMounted(() => {
   initUserState()
   fetchLibrary()
   fetchDocument()
+})
+
+// 监听 activeTab 变化，切换到 documents 时加载文档列表
+watch(activeTab, (newTab) => {
+  if (newTab === 'documents' && documents.value.length === 0) {
+    fetchDocumentsList()
+  }
 })
 
 // 监听路由参数变化

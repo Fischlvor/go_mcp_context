@@ -11,7 +11,7 @@
             <el-option
               v-for="lib in libraries"
               :key="lib.id"
-              :label="`${lib.name} (${lib.version})`"
+              :label="`${lib.name} (${lib.default_version || 'latest'})`"
               :value="lib.id"
             />
           </el-select>
@@ -54,16 +54,11 @@
       <div v-else class="result-list">
         <div v-for="item in results" :key="item.chunk_id" class="result-item">
           <div class="result-meta">
-            <el-tag size="small" :type="item.chunk_type === 'code' ? 'success' : 'info'">
-              {{ item.chunk_type }}
+            <el-tag size="small" type="primary">
+              文档块
             </el-tag>
             <span class="score">
-              综合分数: {{ item.score.toFixed(3) }}
-              <el-tooltip content="向量相似度 / BM25分数">
-                <span class="score-detail">
-                  ({{ item.vector_score.toFixed(3) }} / {{ item.bm25_score.toFixed(3) }})
-                </span>
-              </el-tooltip>
+              相关性: {{ item.relevance.toFixed(3) }}
             </span>
           </div>
           <div class="result-content">
@@ -89,11 +84,11 @@
 import { ref, reactive, onMounted } from 'vue'
 import { getLibraries } from '@/api/library'
 import { searchDocuments } from '@/api/search'
-import type { Library } from '@/api/library'
+import type { LibraryListItem } from '@/api/library'
 import type { SearchResultItem } from '@/api/search'
 import { ElMessage } from 'element-plus'
 
-const libraries = ref<Library[]>([])
+const libraries = ref<LibraryListItem[]>([])
 const loading = ref(false)
 const searched = ref(false)
 const results = ref<SearchResultItem[]>([])

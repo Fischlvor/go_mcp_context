@@ -25,20 +25,25 @@ func InitLogger() *zap.Logger {
 		MaxAge:     zapCfg.MaxAge,
 	}
 
-	// 设置全局日志写入器
-	if zapCfg.IsConsolePrint {
-		global.LogWriter = io.MultiWriter(lumberJackLogger, os.Stdout)
-	} else {
-		global.LogWriter = lumberJackLogger
-	}
+	// 设置全局日志写入器（文件）
+	global.LogWriter = lumberJackLogger
 
-	// 重定向标准库 log
-	log.SetOutput(global.LogWriter)
+	// 重定向标准库 log 到文件
+	log.SetOutput(lumberJackLogger)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
-	// 重定向 Gin 的默认输出（使用 Gin 原生格式）
-	gin.DefaultWriter = global.LogWriter
-	gin.DefaultErrorWriter = global.LogWriter
+	// Gin 日志：控制台 + 文件
+	if zapCfg.IsConsolePrint {
+		// 同时输出到文件和控制台
+		gin.DefaultWriter = io.MultiWriter(lumberJackLogger, os.Stdout)
+		gin.DefaultErrorWriter = io.MultiWriter(lumberJackLogger, os.Stderr)
+		gin.SetMode(gin.DebugMode)
+	} else {
+		// 只输出到文件
+		gin.DefaultWriter = lumberJackLogger
+		gin.DefaultErrorWriter = lumberJackLogger
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	// 创建 zap logger（用于结构化日志场景）
 	writeSyncer := zapcore.AddSync(global.LogWriter)

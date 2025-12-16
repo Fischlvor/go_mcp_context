@@ -110,12 +110,40 @@
                     </td>
                     <td class="hidden h-11 px-2 text-left align-middle text-base font-normal slashed-zero tabular-nums text-stone-800 sm:table-cell sm:px-4 sm:leading-tight">
                       <div class="flex flex-row items-center gap-2">
-                        <span class="inline-flex flex-shrink-0 items-center justify-center" style="width: 20px; height: 20px;">
+                        <!-- GitHub Icon -->
+                        <span v-if="lib.source_type === 'github'" class="inline-flex flex-shrink-0 items-center justify-center" style="width: 20px; height: 20px;">
                           <svg role="img" viewBox="0 0 16 16" width="18" height="18" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0">
                             <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68.003 1.36.092 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
                           </svg>
                         </span>
-                        <span class="truncate text-stone-800 hover:text-stone-600">/{{ lib.name.toLowerCase().replace(/\s+/g, '-') }}/{{ lib.version || 'docs' }}</span>
+                        <!-- Website Icon -->
+                        <span v-else-if="lib.source_type === 'website'" class="inline-flex flex-shrink-0 items-center justify-center" style="width: 20px; height: 20px;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M2 12h20"></path>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1 -4 10 15.3 15.3 0 0 1 -4 -10 15.3 15.3 0 0 1 4 -10z"></path>
+                          </svg>
+                        </span>
+                        <!-- Local Upload Icon -->
+                        <span v-else class="inline-flex flex-shrink-0 items-center justify-center" style="width: 20px; height: 20px;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0">
+                            <path d="M21 15v4a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                          </svg>
+                        </span>
+                        <!-- Source URL or Label -->
+                        <span class="truncate text-stone-800 hover:text-stone-600">
+                          <template v-if="lib.source_type === 'github'">
+                            {{ lib.source_url || 'GitHub' }}
+                          </template>
+                          <template v-else-if="lib.source_type === 'website'">
+                            {{ lib.source_url || 'Website' }}
+                          </template>
+                          <template v-else>
+                            Local Upload
+                          </template>
+                        </span>
                       </div>
                     </td>
                     <td class="hidden h-11 px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:table-cell sm:px-4 sm:leading-none">{{ formatNumber(lib.token_count || 0) }}</td>
@@ -166,12 +194,20 @@
             <input v-model="form.name" type="text" class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" placeholder="e.g. Vue.js" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-stone-700 mb-1">Version</label>
-            <input v-model="form.version" type="text" class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" placeholder="e.g. 3.4.0" />
-          </div>
-          <div>
             <label class="block text-sm font-medium text-stone-700 mb-1">Description</label>
             <textarea v-model="form.description" rows="3" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm resize-none focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" placeholder="Brief description of the library"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-stone-700 mb-1">Source Type</label>
+            <select v-model="form.source_type" class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600">
+              <option value="local">Local Upload</option>
+              <option value="github">GitHub</option>
+              <option value="website">Website</option>
+            </select>
+          </div>
+          <div v-if="form.source_type !== 'local'">
+            <label class="block text-sm font-medium text-stone-700 mb-1">Source URL</label>
+            <input v-model="form.source_url" type="text" class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" :placeholder="form.source_type === 'github' ? 'e.g. vuejs/docs' : 'e.g. vuejs.org/guide'" />
           </div>
         </div>
         <div class="flex justify-end gap-3 border-t border-stone-200 px-6 py-4">
@@ -201,7 +237,7 @@ const ElMessageBox = {
   confirm: (msg: string, title: string, options: any) => Promise.resolve(confirm(msg) ? 'confirm' : Promise.reject()),
 }
 import { getLibraries, createLibrary, updateLibrary, deleteLibrary } from '@/api/library'
-import type { Library } from '@/api/library'
+import type { LibraryListItem } from '@/api/library'
 
 const router = useRouter()
 
@@ -228,7 +264,7 @@ const activeTab = ref('popular')
 
 // 数据状态
 const loading = ref(false)
-const libraries = ref<Library[]>([])
+const libraries = ref<LibraryListItem[]>([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
@@ -245,8 +281,9 @@ const openDropdownId = ref<number | null>(null)
 
 const form = reactive({
   name: '',
-  version: '',
-  description: ''
+  description: '',
+  source_type: 'local',
+  source_url: ''
 })
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -286,22 +323,24 @@ const showAddDialog = () => {
   isEdit.value = false
   editId.value = null
   form.name = ''
-  form.version = ''
   form.description = ''
+  form.source_type = 'local'
+  form.source_url = ''
   dialogVisible.value = true
 }
 
-const handleEdit = (lib: Library) => {
+const handleEdit = (lib: LibraryListItem) => {
   isEdit.value = true
   editId.value = lib.id
   form.name = lib.name
-  form.version = lib.version
-  form.description = lib.description
+  form.description = ''  // 列表项没有 description，需要从详情获取
+  form.source_type = lib.source_type
+  form.source_url = lib.source_url
   openDropdownId.value = null
   dialogVisible.value = true
 }
 
-const handleDelete = (lib: Library) => {
+const handleDelete = (lib: LibraryListItem) => {
   openDropdownId.value = null
   ElMessageBox.confirm(
     `Are you sure to delete "${lib.name}"?`,
@@ -319,7 +358,7 @@ const handleDelete = (lib: Library) => {
 }
 
 const handleSubmit = async () => {
-  if (!form.name || !form.version) {
+  if (!form.name) {
     ElMessage.warning('Please fill in required fields')
     return
   }
@@ -365,15 +404,28 @@ const formatDate = (dateStr: string) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   
-  if (days === 0) return 'today'
-  if (days === 1) return '1 day'
-  if (days < 7) return `${days} days`
-  if (days < 30) return `${Math.floor(days / 7)} weeks`
-  if (days < 365) return `${Math.floor(days / 30)} months`
-  return `${Math.floor(days / 365)} years`
+  // 如果时间戳无效或是未来时间，显示 'now'
+  if (isNaN(date.getTime()) || date > now) {
+    return 'just now'
+  }
+  
+  const diff = now.getTime() - date.getTime()
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  const years = Math.floor(days / 365)
+  
+  // Context7 风格：简洁的数字 + 时间单位
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''}`
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''}`
+  if (days < 7) return `${days} day${days > 1 ? 's' : ''}`
+  if (weeks < 4) return `${weeks} week${weeks > 1 ? 's' : ''}`
+  if (months < 12) return `${months} month${months > 1 ? 's' : ''}`
+  return `${years} year${years > 1 ? 's' : ''}`
 }
 
 onMounted(() => {
