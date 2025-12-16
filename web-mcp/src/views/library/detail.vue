@@ -283,12 +283,53 @@
           <div v-if="activeTab === 'documents'" class="mt-8">
             <div class="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
               <div class="space-y-6">
-                <!-- 标题 -->
-                <div>
-                  <h3 class="text-base font-semibold text-stone-800">Documents</h3>
-                  <p class="mt-1 text-sm text-stone-500">
-                    {{ version ? `Documents in version ${version}` : 'All documents' }}
-                  </p>
+                <!-- 标题和上传按钮 -->
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-base font-semibold text-stone-800">Documents</h3>
+                    <p class="mt-1 text-sm text-stone-500">
+                      {{ version ? `Documents in version ${version}` : `Documents in version ${library.default_version || 'default'}` }}
+                    </p>
+                  </div>
+                  <label 
+                    v-if="isLoggedIn"
+                    :class="[
+                      'flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-white transition-colors whitespace-nowrap cursor-pointer',
+                      uploading ? 'bg-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+                    ]"
+                  >
+                    <svg v-if="!uploading" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path>
+                      <path d="M7 9l5 -5l5 5"></path>
+                      <path d="M12 4l0 12"></path>
+                    </svg>
+                    <svg v-else class="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>{{ uploading ? 'Processing...' : 'Upload' }}</span>
+                    <input 
+                      type="file" 
+                      class="hidden" 
+                      accept=".md,.pdf,.docx"
+                      :disabled="uploading"
+                      @change="handleFileUpload"
+                    />
+                  </label>
+                </div>
+
+                <!-- 上传进度条 -->
+                <div v-if="uploading" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-emerald-800">{{ uploadMessage }}</span>
+                    <span class="text-sm font-medium text-emerald-800">{{ uploadProgress }}%</span>
+                  </div>
+                  <div class="h-2 w-full overflow-hidden rounded-full bg-emerald-200">
+                    <div 
+                      class="h-full rounded-full bg-emerald-600 transition-all duration-300"
+                      :style="{ width: uploadProgress + '%' }"
+                    ></div>
+                  </div>
                 </div>
 
                 <!-- 文档列表表格 -->
@@ -379,7 +420,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
 import { getLibrary } from '@/api/library'
-import { getLatestCode, getDocuments } from '@/api/document'
+import { getLatestCode, getLatestInfo, getDocuments, uploadDocumentWithSSE } from '@/api/document'
 import { searchDocuments } from '@/api/search'
 import type { Library } from '@/api/library'
 import type { SearchResultItem } from '@/api/search'
@@ -389,12 +430,9 @@ const { isLoggedIn, userEmail, userPlan, initUserState, redirectToSSO } = useUse
 
 const libraryId = computed(() => Number(route.params.id))
 const version = computed(() => {
-  // 只有在 /libraries/:id/:version/:title 时才有版本
-  return route.params.version as string | undefined
-})
-const documentTitle = computed(() => {
-  // 只有在 /libraries/:id/:version/:title 时才有 title
-  return route.params.title as string | undefined
+  // 从路由获取版本，如果没有则使用库的默认版本
+  const routeVersion = route.params.version as string | undefined
+  return routeVersion || library.value.default_version || undefined
 })
 const library = ref<Library>({
   id: 0,
@@ -430,31 +468,32 @@ const page = ref(1)
 const pageSize = ref(10)
 const totalDocs = ref(0)
 
+// 上传状态
+const uploading = ref(false)
+const uploadProgress = ref(0)
+const uploadMessage = ref('')
+
 const handleSignIn = () => {
   redirectToSSO()
 }
 
 const fetchLibrary = async () => {
-  const res = await getLibrary(libraryId.value)
-  if (res.code === 0) {
-    library.value = res.data
-  }
+  const library_data = await getLibrary(libraryId.value)
+  library.value = library_data
 }
 
-// 加载文档内容
+// 加载文档内容（根据 searchMode 切换 code/info）
 const fetchDocument = async () => {
   loadingDoc.value = true
   searchResult.value = 'Loading document...'
   
   try {
-    // 获取指定版本的最新文档内容（如果指定了版本）
-    const res = await getLatestCode(libraryId.value, version.value)
-    if (res.code === 0) {
-      currentDocTitle.value = res.data.title
-      searchResult.value = res.data.content || 'No content available.'
-    } else {
-      searchResult.value = 'No documents available. Upload a document to get started.'
-    }
+    // 根据 searchMode 获取对应类型的文档块
+    const res = searchMode.value === 'info' 
+      ? await getLatestInfo(libraryId.value, version.value)
+      : await getLatestCode(libraryId.value, version.value)
+    currentDocTitle.value = res.title
+    searchResult.value = res.content || 'No content available. Upload a document to get started.'
   } catch (error) {
     searchResult.value = 'Failed to load document.'
   } finally {
@@ -472,15 +511,92 @@ const fetchDocumentsList = async () => {
       page: page.value,
       page_size: pageSize.value
     })
-    if (res.code === 0) {
-      documents.value = res.data.list || []
-      totalDocs.value = res.data.total
-    }
-  } catch (error) {
-    console.error('Failed to fetch documents:', error)
+    documents.value = res.list || []
+    totalDocs.value = res.total
   } finally {
     loadingDocs.value = false
   }
+}
+
+// 上传文档
+const handleFileUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  const allowedTypes = ['.md', '.pdf', '.docx']
+  const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+  if (!allowedTypes.includes(ext)) {
+    alert('Only .md, .pdf, .docx formats are supported')
+    return
+  }
+
+  // 使用当前版本或默认版本
+  const uploadVersion = version.value || library.value.default_version || 'default'
+
+  // 重置状态
+  uploading.value = true
+  uploadProgress.value = 0
+  uploadMessage.value = 'Uploading...'
+
+  try {
+    await uploadDocumentWithSSE(
+      libraryId.value,
+      file,
+      {
+        onProgress: (status) => {
+          const progressMap: Record<string, number> = {
+            uploaded: 10,
+            parsing: 30,
+            chunking: 50,
+            embedding: 70,
+            saving: 90
+          }
+          uploadProgress.value = progressMap[status.stage] || status.progress || 0
+          uploadMessage.value = status.message || status.stage
+        },
+        onComplete: () => {
+          uploadProgress.value = 100
+          uploadMessage.value = 'Upload successful!'
+          setTimeout(() => {
+            uploading.value = false
+            uploadProgress.value = 0
+            uploadMessage.value = ''
+            fetchDocumentsList()
+            fetchLibrary()
+          }, 500)
+        },
+        onError: (error) => {
+          const errorMsg = error.message || 'Unknown error'
+          const status = (error as any).status
+          const code = (error as any).code
+          
+          // 区分错误类型
+          let displayMsg = errorMsg
+          if (status) {
+            // HTTP 错误
+            displayMsg = `HTTP Error: ${displayMsg}`
+          } else if (code !== undefined) {
+            // 业务错误
+            displayMsg = `Error (${code}): ${displayMsg}`
+          }
+          
+          alert('Upload failed:\n' + displayMsg)
+          uploading.value = false
+          uploadProgress.value = 0
+          uploadMessage.value = ''
+        }
+      },
+      uploadVersion
+    )
+  } catch (error) {
+    alert('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    uploading.value = false
+    uploadProgress.value = 0
+    uploadMessage.value = ''
+  }
+  
+  input.value = ''
 }
 
 const handleSearch = async () => {
@@ -504,8 +620,8 @@ const handleSearch = async () => {
       limit: 10
     })
     
-    if (res.code === 0 && res.data.results.length > 0) {
-      searchResults.value = res.data.results
+    if (res.results.length > 0) {
+      searchResults.value = res.results
       searchResult.value = '' // 清空旧的文本结果
     } else {
       searchResults.value = []
@@ -590,9 +706,9 @@ const getTruncatedText = (text: string | undefined) => {
   return text
 }
 
-onMounted(() => {
+onMounted(async () => {
   initUserState()
-  fetchLibrary()
+  await fetchLibrary()
   fetchDocument()
 })
 
@@ -603,8 +719,17 @@ watch(activeTab, (newTab) => {
   }
 })
 
-// 监听路由参数变化
-watch(() => route.params.title, () => {
+// 监听版本变化，重新加载文档
+watch(() => route.params.version, () => {
+  fetchDocument()
+  // 如果在 documents tab，也重新加载文档列表
+  if (activeTab.value === 'documents') {
+    fetchDocumentsList()
+  }
+})
+
+// 监听 searchMode 变化，重新加载文档
+watch(searchMode, () => {
   fetchDocument()
 })
 </script>

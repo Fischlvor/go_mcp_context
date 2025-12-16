@@ -29,7 +29,7 @@ export interface SearchRequest {
 }
 
 // 搜索文档
-export const searchDocuments = (data: SearchRequest): Promise<ApiResponse<SearchResult>> => {
+export const searchDocuments = (data: SearchRequest): Promise<SearchResult> => {
   return service({
     url: '/search',
     method: 'post',

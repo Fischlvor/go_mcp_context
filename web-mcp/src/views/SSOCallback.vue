@@ -12,7 +12,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUser, fetchUserInfo } from '@/stores/user'
-import request from '@/utils/request'
+import { handleSSOCallback } from '@/api/auth'
 
 const router = useRouter()
 const { login } = useUser()
@@ -42,23 +42,16 @@ onMounted(async () => {
       }
     }
 
-    // 用 code 向后端换取 token
-    const redirectUri = encodeURIComponent(window.location.origin + '/sso-callback')
-    const res: any = await request.get(`/auth/callback?code=${code}&redirect_uri=${redirectUri}`)
-
-    if (res.code !== 0) {
-      console.error('登录失败:', res.msg)
-      alert('登录失败：' + res.msg)
-      router.push('/')
-      return
-    }
+    // 用 code 向后端换取 token（不需要手动编码，axios 会自动编码）
+    const redirectUri = window.location.origin + '/sso-callback'
+    const res = await handleSSOCallback(code, redirectUri)
 
     // 保存 token 到 store
     login({
       email: '',
       plan: 'FREE',
       team: 'Personal'
-    }, res.data.access_token)
+    }, res.access_token)
 
     // 获取用户信息
     await fetchUserInfo()

@@ -74,6 +74,20 @@ func (s *DocumentService) Upload(libraryID uint, version string, file multipart.
 		return nil, ErrNotFound
 	}
 
+	// 检查版本是否存在
+	versionExists := version == library.DefaultVersion
+	if !versionExists {
+		for _, v := range library.Versions {
+			if v == version {
+				versionExists = true
+				break
+			}
+		}
+	}
+	if !versionExists {
+		return nil, fmt.Errorf("version %s does not exist", version)
+	}
+
 	// 读取文件内容
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -103,12 +117,6 @@ func (s *DocumentService) Upload(libraryID uint, version string, file multipart.
 	versionDir := sanitizeFileName(version)
 	key := filepath.Join(global.Config.Qiniu.PathPrefix, libDir, versionDir, header.Filename)
 
-	// 根据存储类型上传文件
-	storageType := global.Config.System.StorageType
-	if storageType == "" {
-		storageType = "local"
-	}
-
 	// 使用 Storage 接口上传
 	result, err := global.Storage.Upload(context.Background(), key, file, header.Size, "")
 	if err != nil {
@@ -125,7 +133,6 @@ func (s *DocumentService) Upload(libraryID uint, version string, file multipart.
 		FileSize:    int64(len(content)),
 		ContentHash: contentHash,
 		Status:      "processing",
-		StorageType: storageType,
 	}
 
 	if err := global.DB.Create(doc).Error; err != nil {
@@ -150,6 +157,21 @@ func (s *DocumentService) UploadWithCallback(libraryID uint, version string, fil
 		return nil, ErrNotFound
 	}
 
+	// 检查版本是否存在
+	versionExists := version == library.DefaultVersion
+	if !versionExists {
+		for _, v := range library.Versions {
+			if v == version {
+				versionExists = true
+				break
+			}
+		}
+	}
+	if !versionExists {
+		close(statusChan)
+		return nil, fmt.Errorf("version %s does not exist", version)
+	}
+
 	// 读取文件内容
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -182,12 +204,6 @@ func (s *DocumentService) UploadWithCallback(libraryID uint, version string, fil
 	versionDir := sanitizeFileName(version)
 	key := filepath.Join(global.Config.Qiniu.PathPrefix, libDir, versionDir, header.Filename)
 
-	// 根据存储类型上传文件
-	storageType := global.Config.System.StorageType
-	if storageType == "" {
-		storageType = "local"
-	}
-
 	// 使用 Storage 接口上传
 	result, err := global.Storage.Upload(context.Background(), key, file, header.Size, "")
 	if err != nil {
@@ -205,7 +221,6 @@ func (s *DocumentService) UploadWithCallback(libraryID uint, version string, fil
 		FileSize:    int64(len(content)),
 		ContentHash: contentHash,
 		Status:      "processing",
-		StorageType: storageType,
 	}
 
 	if err := global.DB.Create(doc).Error; err != nil {
@@ -242,10 +257,17 @@ func (s *DocumentService) GetByID(id uint) (*dbmodel.DocumentUpload, error) {
 }
 
 // GetLatestContent 获取库的最新文档内容（按创建时间倒序）
-func (s *DocumentService) GetLatestContent(libraryID uint) (string, string, error) {
+// 如果指定了版本，则只查询该版本的文档
+func (s *DocumentService) GetLatestContent(libraryID uint, version string) (string, string, error) {
 	var doc dbmodel.DocumentUpload
-	if err := global.DB.Where("library_id = ? AND status = ?", libraryID, "completed").
-		Order("created_at DESC").First(&doc).Error; err != nil {
+	query := global.DB.Where("library_id = ? AND status = ?", libraryID, "completed")
+
+	// 如果指定了版本，添加版本过滤
+	if version != "" {
+		query = query.Where("version = ?", version)
+	}
+
+	if err := query.Order("created_at DESC").First(&doc).Error; err != nil {
 		return "", "", ErrNotFound
 	}
 
@@ -256,6 +278,31 @@ func (s *DocumentService) GetLatestContent(libraryID uint) (string, string, erro
 	}
 
 	return doc.Title, string(content), nil
+}
+
+// GetChunks 获取库的文档块
+// mode: "code" 只返回代码块, "info" 只返回文档块, "" 返回全部
+func (s *DocumentService) GetChunks(libraryID uint, version string, mode string) ([]dbmodel.DocumentChunk, error) {
+	var chunks []dbmodel.DocumentChunk
+	query := global.DB.Where("library_id = ? AND status = ?", libraryID, "active")
+
+	// 版本过滤
+	if version != "" {
+		query = query.Where("version = ?", version)
+	}
+
+	// 类型过滤
+	if mode == "code" {
+		query = query.Where("chunk_type = ?", "code")
+	} else if mode == "info" {
+		query = query.Where("chunk_type = ?", "info")
+	}
+
+	if err := query.Order("chunk_index ASC").Find(&chunks).Error; err != nil {
+		return nil, err
+	}
+
+	return chunks, nil
 }
 
 // Delete 删除文档上传记录（软删除）

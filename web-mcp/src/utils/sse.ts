@@ -95,8 +95,27 @@ export const createSSEPost = async <T = any>(
       body: data instanceof FormData ? data : JSON.stringify(data),
     })
 
+    // HTTP 错误处理
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+      
+      // 尝试解析响应体获取更详细的错误信息
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json()
+          errorMessage = errorData.msg || errorData.message || errorMessage
+        } else {
+          const text = await response.text()
+          if (text) errorMessage = text
+        }
+      } catch (e) {
+        // 忽略解析错误，使用默认错误信息
+      }
+      
+      const error = new Error(errorMessage)
+      ;(error as any).status = response.status
+      throw error
     }
 
     const reader = response.body?.getReader()
@@ -125,17 +144,33 @@ export const createSSEPost = async <T = any>(
         if (line.startsWith('data: ')) {
           try {
             const jsonStr = line.slice(6) // 移除 "data: " 前缀
-            const eventData = JSON.parse(jsonStr)
+            const response = JSON.parse(jsonStr)
+            
+            // 统一格式：{ code: 0, msg: "...", data: { stage, progress, message, ... } }
+            const { code, msg, data } = response
+            
+            // 检查错误（code !== 0）
+            if (code !== 0) {
+              const error = new Error(msg || 'Upload failed')
+              ;(error as any).code = code
+              options.onError?.(error)
+              return
+            }
+            
+            // 检查失败事件
+            if (data?.stage === 'failed') {
+              const error = new Error(data.message || msg || 'Processing failed')
+              options.onError?.(error)
+              return
+            }
             
             options.onMessage?.({ 
-              type: eventData.stage || eventData.type || 'message', 
-              data: eventData 
+              type: data?.stage || 'message', 
+              data: data 
             })
 
-            // 检查是否完成或失败
-            if (eventData.stage === 'completed' || eventData.stage === 'failed' || 
-                eventData.type === 'completed' || eventData.type === 'failed' ||
-                eventData.type === 'error') {
+            // 检查是否完成
+            if (data?.stage === 'completed') {
               options.onComplete?.()
               return
             }
