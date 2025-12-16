@@ -120,10 +120,8 @@ const fetchLibraries = async () => {
       page: page.value,
       page_size: pageSize.value
     })
-    if (res.code === 0) {
-      libraries.value = res.data.list
-      total.value = res.data.total
-    }
+    libraries.value = res.list
+    total.value = res.total
   } finally {
     loading.value = false
   }

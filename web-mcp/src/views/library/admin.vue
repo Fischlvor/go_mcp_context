@@ -382,26 +382,20 @@ const handleSignIn = () => {
 
 const fetchLibrary = async () => {
   const res = await getLibrary(libraryId.value)
-  if (res.code === 0) {
-    library.value = res.data
-    editForm.name = res.data.name
-    editForm.description = res.data.description
-  }
+  library.value = res
+  editForm.name = res.name
+  editForm.description = res.description
 }
 
 const fetchVersions = async () => {
   loadingVersions.value = true
   try {
     const res = await getVersions(libraryId.value)
-    if (res.code === 0) {
-      versions.value = res.data || []
-      // 自动选择第一个版本
-      if (versions.value.length > 0 && !selectedVersion.value) {
-        selectedVersion.value = versions.value[0].version
-      }
+    versions.value = res || []
+    // 自动选择第一个版本
+    if (versions.value.length > 0 && !selectedVersion.value) {
+      selectedVersion.value = versions.value[0].version
     }
-  } catch (error) {
-    console.error('Failed to fetch versions:', error)
   } finally {
     loadingVersions.value = false
   }
@@ -415,10 +409,8 @@ const fetchDocuments = async () => {
       page: page.value,
       page_size: pageSize.value
     })
-    if (res.code === 0) {
-      documents.value = res.data.list || []
-      totalDocs.value = res.data.total
-    }
+    documents.value = res.list || []
+    totalDocs.value = res.total
   } finally {
     loadingDocs.value = false
   }
@@ -433,10 +425,8 @@ const saveConfiguration = async () => {
   saving.value = true
   try {
     const res = await updateLibrary(libraryId.value, editForm)
-    if (res.code === 0) {
-      library.value = res.data
-      console.log('✓ Configuration saved')
-    }
+    library.value = res
+    console.log('✓ Configuration saved')
   } finally {
     saving.value = false
   }
@@ -549,15 +539,12 @@ const handleDeleteLibrary = async () => {
   if (!confirm(`Are you sure you want to delete the library "${library.value.name}"? This action cannot be undone.`)) return
   
   try {
-    const res = await deleteLibrary(libraryId.value)
-    if (res.code === 0) {
-      console.log('✓ Library deleted')
-      alert('Library deleted successfully')
-      router.push('/')
-    }
+    await deleteLibrary(libraryId.value)
+    console.log('✓ Library deleted')
+    alert('Library deleted successfully')
+    router.push('/')
   } catch (error) {
     console.error('Failed to delete library:', error)
-    alert('Failed to delete library: ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -598,15 +585,12 @@ const handleRefreshVersion = async (version: string) => {
   if (!confirm(`Refresh version "${version}"? This will reprocess all documents in this version.`)) return
   
   try {
-    const res = await refreshVersion(libraryId.value, version)
-    if (res.code === 0) {
-      console.log('✓ Version refresh started')
-      alert('Version refresh started. Documents will be reprocessed in the background.')
-      await fetchVersions()
-    }
+    await refreshVersion(libraryId.value, version)
+    console.log('✓ Version refresh started')
+    alert('Version refresh started. Documents will be reprocessed in the background.')
+    await fetchVersions()
   } catch (error) {
     console.error('Failed to refresh version:', error)
-    alert('Failed to refresh version: ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -614,15 +598,12 @@ const handleDeleteVersion = async (version: string) => {
   if (!confirm(`Are you sure you want to delete version "${version}"? This will delete all documents in this version.`)) return
   
   try {
-    const res = await deleteVersion(libraryId.value, version)
-    if (res.code === 0) {
-      console.log('✓ Version deleted')
-      alert('Version deleted successfully')
-      await fetchVersions()
-    }
+    await deleteVersion(libraryId.value, version)
+    console.log('✓ Version deleted')
+    alert('Version deleted successfully')
+    await fetchVersions()
   } catch (error) {
     console.error('Failed to delete version:', error)
-    alert('Failed to delete version: ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 
@@ -639,15 +620,14 @@ const handleAddVersion = async () => {
       : `v${newVersionName.value}`
     
     const res = await createVersion(libraryId.value, versionWithPrefix)
-    if (res.code === 0) {
-      console.log('✓ Version created')
-      showAddVersionModal.value = false
-      newVersionName.value = ''
-      await fetchVersions()
-    }
+    // 拦截器已处理错误，这里只处理成功情况
+    console.log('✓ Version created')
+    showAddVersionModal.value = false
+    newVersionName.value = ''
+    await fetchVersions()
   } catch (error) {
+    // 错误已由拦截器显示，这里只记录日志
     console.error('Failed to add version:', error)
-    alert('Failed to add version: ' + (error instanceof Error ? error.message : 'Unknown error'))
   }
 }
 

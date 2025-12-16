@@ -66,9 +66,14 @@ service.interceptors.response.use(
         window.location.href = '/'
         return Promise.reject(new Error(response.data.msg))
       }
+      
+      // 业务错误：显示错误信息并 reject
       ElMessage.error(response.data.msg)
+      return Promise.reject(response.data)
     }
-    return response.data
+    
+    // 成功响应：返回 data 部分（如果存在则返回 data.data，否则返回整个 data）
+    return response.data.data !== undefined ? response.data.data : response.data
   },
   (error: AxiosError<ApiResponse<any>>) => {
     // HTTP 错误处理

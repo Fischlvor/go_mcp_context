@@ -452,11 +452,7 @@ const loadAPIKeys = async () => {
   apiKeysLoading.value = true
   try {
     const res = await getAPIKeys()
-    if (res.code === 0) {
-      apiKeys.value = res.data || []
-    }
-  } catch (e) {
-    console.error('Failed to load API keys:', e)
+    apiKeys.value = res || []
   } finally {
     apiKeysLoading.value = false
   }
@@ -468,17 +464,12 @@ const handleCreateKey = async () => {
   creatingKey.value = true
   try {
     const res = await createAPIKey({ name: newKeyName.value.trim() })
-    if (res.code === 0) {
-      newlyCreatedKey.value = res.data
-      newKeyName.value = ''
-      showCreateDialog.value = false
-      await loadAPIKeys()
-    } else {
-      alert(res.msg || '创建失败')
-    }
+    newlyCreatedKey.value = res
+    newKeyName.value = ''
+    showCreateDialog.value = false
+    await loadAPIKeys()
   } catch (e) {
     console.error('Failed to create API key:', e)
-    alert('创建失败')
   } finally {
     creatingKey.value = false
   }
@@ -488,15 +479,10 @@ const handleCreateKey = async () => {
 const handleDeleteKey = async (id: number) => {
   if (!confirm('确定要删除这个 API Key 吗？')) return
   try {
-    const res = await deleteAPIKey(id)
-    if (res.code === 0) {
-      await loadAPIKeys()
-    } else {
-      alert(res.msg || '删除失败')
-    }
+    await deleteAPIKey(id)
+    await loadAPIKeys()
   } catch (e) {
     console.error('Failed to delete API key:', e)
-    alert('删除失败')
   }
 }
 

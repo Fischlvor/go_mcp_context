@@ -18,8 +18,7 @@ type DocumentUpload struct {
 	ChunkCount   int     `json:"chunk_count" gorm:"default:0"`      // 生成的 chunk 数量
 	TokenCount   int     `json:"token_count" gorm:"default:0"`      // 总 token 数
 	ErrorMessage string  `json:"error_message,omitempty" gorm:"type:text"`
-	Status       string  `json:"status" gorm:"size:20;default:'pending'"`    // pending, processing, completed, failed, deleted
-	StorageType  string  `json:"storage_type" gorm:"size:20;default:'local"` // local, qiniu
+	Status       string  `json:"status" gorm:"size:20;default:'pending'"` // pending, processing, completed, failed, deleted
 	Library      Library `json:"-" gorm:"foreignKey:LibraryID"`
 }
 

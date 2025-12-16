@@ -45,7 +45,7 @@ export interface LibraryCreateRequest {
 }
 
 // 获取库列表
-export const getLibraries = (params?: { name?: string; page?: number; page_size?: number }): Promise<ApiResponse<LibraryListResponse>> => {
+export const getLibraries = (params?: { name?: string; page?: number; page_size?: number }): Promise<LibraryListResponse> => {
   return service({
     url: '/libraries',
     method: 'get',
@@ -63,7 +63,7 @@ export const createLibrary = (data: LibraryCreateRequest): Promise<ApiResponse<L
 }
 
 // 获取库详情
-export const getLibrary = (id: number): Promise<ApiResponse<Library>> => {
+export const getLibrary = (id: number): Promise<Library> => {
   return service({
     url: `/libraries/${id}`,
     method: 'get'
@@ -71,7 +71,7 @@ export const getLibrary = (id: number): Promise<ApiResponse<Library>> => {
 }
 
 // 更新库
-export const updateLibrary = (id: number, data: LibraryCreateRequest): Promise<ApiResponse<Library>> => {
+export const updateLibrary = (id: number, data: LibraryCreateRequest): Promise<Library> => {
   return service({
     url: `/libraries/${id}`,
     method: 'put',
@@ -80,7 +80,7 @@ export const updateLibrary = (id: number, data: LibraryCreateRequest): Promise<A
 }
 
 // 删除库
-export const deleteLibrary = (id: number): Promise<ApiResponse<null>> => {
+export const deleteLibrary = (id: number): Promise<null> => {
   return service({
     url: `/libraries/${id}`,
     method: 'delete'
@@ -88,7 +88,7 @@ export const deleteLibrary = (id: number): Promise<ApiResponse<null>> => {
 }
 
 // 获取版本列表
-export const getVersions = (libraryId: number): Promise<ApiResponse<any>> => {
+export const getVersions = (libraryId: number): Promise<any> => {
   return service({
     url: `/libraries/${libraryId}/versions`,
     method: 'get'
@@ -96,7 +96,7 @@ export const getVersions = (libraryId: number): Promise<ApiResponse<any>> => {
 }
 
 // 创建版本
-export const createVersion = (libraryId: number, version: string): Promise<ApiResponse<null>> => {
+export const createVersion = (libraryId: number, version: string): Promise<null> => {
   return service({
     url: `/libraries/${libraryId}/versions`,
     method: 'post',
@@ -105,7 +105,7 @@ export const createVersion = (libraryId: number, version: string): Promise<ApiRe
 }
 
 // 删除版本
-export const deleteVersion = (libraryId: number, version: string): Promise<ApiResponse<null>> => {
+export const deleteVersion = (libraryId: number, version: string): Promise<null> => {
   return service({
     url: `/libraries/${libraryId}/versions/${version}`,
     method: 'delete'
@@ -113,7 +113,7 @@ export const deleteVersion = (libraryId: number, version: string): Promise<ApiRe
 }
 
 // 刷新版本
-export const refreshVersion = (libraryId: number, version: string): Promise<ApiResponse<null>> => {
+export const refreshVersion = (libraryId: number, version: string): Promise<null> => {
   return service({
     url: `/libraries/${libraryId}/versions/${version}/refresh`,
     method: 'post'

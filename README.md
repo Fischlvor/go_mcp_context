@@ -115,9 +115,12 @@ DELETE /api/v1/libraries/:id  # 删除库
 ### 文档管理
 
 ```
-POST   /api/v1/documents/upload  # 上传文档
-GET    /api/v1/documents/:id     # 获取文档
-DELETE /api/v1/documents/:id     # 删除文档
+GET    /api/v1/documents/list                           # 获取文档列表
+GET    /api/v1/documents/detail/:id                     # 获取文档详情
+GET    /api/v1/documents/chunks/:mode/:libid/*version   # 获取库的文档块 (mode: code/info, version 可选)
+POST   /api/v1/documents/upload                         # 上传文档
+POST   /api/v1/documents/upload-sse                     # 上传文档（SSE 实时状态）
+DELETE /api/v1/documents/:id                            # 删除文档
 ```
 
 ### 搜索
@@ -310,6 +313,50 @@ go-mcp-context/
 - [ ] MCP IDE 集成测试
 
 ## 📝 开发日志
+
+### 2025-12-16 (续)
+
+#### Added
+- **文档块获取 API 重构**
+  - 合并两个 GetChunks 路由为统一端点：`GET /documents/chunks/:mode/:libid/*version`
+  - 支持 `mode` 参数（code/info）按类型筛选文档块
+  - 版本参数可选，未指定时默认使用库的 `DefaultVersion`
+  - 后端 `GetChunks()` 方法支持 mode 和 version 过滤
+
+- **前端文档块格式化**
+  - 新增 `formatCodeChunk()` 和 `formatInfoChunk()` 辅助函数
+  - Code 模式：标题 → 来源 → 描述 → 代码块（带语言标记）
+  - Info 模式：标题 → 来源 → 描述 → 正文内容
+  - 块之间使用分隔符 `\n\n--------------------------------\n\n` 分隔
+
+- **前端 Code/Info 标签页切换**
+  - 导入 `getLatestInfo()` 函数
+  - `fetchDocument()` 根据 `searchMode` 调用对应 API
+  - 添加 `watch(searchMode)` 监听，切换时自动加载内容
+
+#### Changed
+- **路由路径调整**
+  - `/documents` → `/documents/list`（文档列表）
+  - `/documents/:id` → `/documents/detail/:id`（文档详情）
+  - 新增 `/documents/chunks/:mode/:libid/*version`（文档块）
+
+- **API 响应格式**
+  - `getChunks()` 返回 `ChunksResponse` 包含 chunks 数组
+  - `getLatestCode()`、`getLatestInfo()` 返回合并后的 `DocumentContent`
+
+#### Fixed
+- **路由冲突修复**
+  - 解决 `:id` 和 `:mode` 参数冲突，将 chunks 路由独立为 `/documents/chunks/...`
+  
+- **SSO 设备查询修复**
+  - `auth_service.go` 设备查询添加 `app_id` 条件
+  - 修复不同应用设备记录互相干扰的问题
+
+- **Code 模式显示修复**
+  - `formatCodeChunk()` 优先使用 `code` 字段，否则使用 `chunk_text`
+  - 确保代码块正常显示
+
+---
 
 ### 2025-12-16
 
