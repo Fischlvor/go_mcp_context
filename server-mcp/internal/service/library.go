@@ -329,7 +329,7 @@ func (s *LibraryService) GetVersions(libraryID uint) ([]response.VersionInfo, er
 	return versions, nil
 }
 
-// CreateVersion 创建新版本（只是标记，实际版本在上传文档时创建）
+// CreateVersion 创建新版本
 func (s *LibraryService) CreateVersion(libraryID uint, version string) error {
 	// 自动添加 v 前缀（如果没有的话）
 	if !regexp.MustCompile(`^v`).MatchString(version) {
@@ -347,7 +347,14 @@ func (s *LibraryService) CreateVersion(libraryID uint, version string) error {
 		return ErrNotFound
 	}
 
-	// 检查版本是否已存在
+	// 检查版本是否已存在（在 versions 数组或 document_uploads 表中）
+	for _, v := range library.Versions {
+		if v == version {
+			return ErrVersionExists
+		}
+	}
+
+	// 也检查 document_uploads 表
 	var count int64
 	if err := global.DB.Table("document_uploads").
 		Where("library_id = ? AND version = ?", libraryID, version).
@@ -359,7 +366,14 @@ func (s *LibraryService) CreateVersion(libraryID uint, version string) error {
 		return ErrVersionExists
 	}
 
-	// 版本在上传文档时自动创建，这里只做验证
+	// 添加版本到 versions 数组
+	library.Versions = append(library.Versions, version)
+
+	// 保存到数据库
+	if err := global.DB.Model(&library).Update("versions", library.Versions).Error; err != nil {
+		return err
+	}
+
 	return nil
 }
 

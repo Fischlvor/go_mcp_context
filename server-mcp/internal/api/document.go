@@ -1,16 +1,16 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
 	"go-mcp-context/internal/service"
+	"go-mcp-context/pkg/global"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type DocumentApi struct{}
@@ -76,31 +76,18 @@ func (d *DocumentApi) Upload(c *gin.Context) {
 
 // UploadWithSSE 上传文档（SSE 实时推送处理状态）
 func (d *DocumentApi) UploadWithSSE(c *gin.Context) {
-	// 设置 SSE 响应头
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
-	c.Header("Access-Control-Allow-Origin", "*")
-
-	// 获取 flusher
-	flusher, ok := c.Writer.(interface{ Flush() })
+	// 创建文档上传专用 SSE 写入器
+	sse, ok := response.NewDocumentSSEWriter(c)
 	if !ok {
 		c.SSEvent("error", "SSE not supported")
 		return
-	}
-
-	// 发送 SSE 事件的辅助函数
-	sendEvent := func(eventType string, data interface{}) {
-		jsonData, _ := json.Marshal(data)
-		fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
-		flusher.Flush()
 	}
 
 	// 解析参数
 	libraryIDStr := c.PostForm("library_id")
 	libraryID, err := strconv.ParseUint(libraryIDStr, 10, 32)
 	if err != nil {
-		sendEvent("error", map[string]string{"message": "无效的库ID"})
+		sse.SendError("无效的库ID")
 		return
 	}
 
@@ -111,7 +98,7 @@ func (d *DocumentApi) UploadWithSSE(c *gin.Context) {
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		sendEvent("error", map[string]string{"message": "未上传文件"})
+		sse.SendError("未上传文件")
 		return
 	}
 	defer file.Close()
@@ -130,30 +117,24 @@ func (d *DocumentApi) UploadWithSSE(c *gin.Context) {
 		} else if errors.Is(err, service.ErrInvalidParams) {
 			errMsg = "不支持的文件类型"
 		}
-		sendEvent("error", map[string]string{"message": errMsg})
+		global.Log.Error("Document upload failed", zap.String("error", errMsg), zap.Error(err))
+		sse.SendError(errMsg)
 		return
 	}
 
 	// 发送上传成功事件
-	sendEvent("uploaded", map[string]interface{}{
-		"document_id": doc.ID,
-		"title":       doc.Title,
-		"status":      doc.Status,
-	})
+	sse.SendProgress("uploaded", 5, "文件上传成功", doc.ID)
 
 	// 监听处理状态
 	for status := range statusChan {
-		sendEvent(status.Stage, map[string]interface{}{
-			"document_id": doc.ID,
-			"stage":       status.Stage,
-			"progress":    status.Progress,
-			"message":     status.Message,
-			"status":      status.Status,
-		})
-
-		// 处理完成或失败，退出
-		if status.Stage == "completed" || status.Stage == "failed" {
+		if status.Stage == "completed" {
+			sse.SendComplete(doc.ID, doc.Title)
 			break
+		} else if status.Stage == "failed" {
+			sse.SendFailed(status.Message, doc.ID)
+			break
+		} else {
+			sse.SendProgress(status.Stage, status.Progress, status.Message, doc.ID)
 		}
 	}
 }
@@ -175,27 +156,48 @@ func (d *DocumentApi) Get(c *gin.Context) {
 	response.OkWithData(doc, c)
 }
 
-// GetLatestCode 获取库的最新文档内容
-// GET /documents/code/:libid
-func (d *DocumentApi) GetLatestCode(c *gin.Context) {
+// GetChunks 获取库的文档块
+// GET /documents/:mode/:libid/*version
+// mode: code 或 info, version 可选
+func (d *DocumentApi) GetChunks(c *gin.Context) {
+	mode := c.Param("mode") // code 或 info
+	if mode != "code" && mode != "info" {
+		response.FailWithMessage("无效的模式，必须是 code 或 info", c)
+		return
+	}
+
 	libraryID, err := strconv.ParseUint(c.Param("libid"), 10, 32)
 	if err != nil {
 		response.FailWithMessage("无效的库ID", c)
 		return
 	}
 
-	title, content, err := documentService.GetLatestContent(uint(libraryID))
+	// 处理版本参数（*version 会带有前导斜杠）
+	version := c.Param("version")
+	if len(version) > 0 && version[0] == '/' {
+		version = version[1:]
+	}
+
+	// 如果没有指定版本，使用库的默认版本
+	if version == "" {
+		library, err := libraryService.GetByID(uint(libraryID))
+		if err != nil {
+			response.FailWithMessage("库不存在", c)
+			return
+		}
+		version = library.DefaultVersion
+	}
+
+	chunks, err := documentService.GetChunks(uint(libraryID), version, mode)
 	if err != nil {
 		response.OkWithData(gin.H{
-			"title":   "",
-			"content": "No documents available. Upload a document to get started.",
+			"chunks": []interface{}{},
 		}, c)
 		return
 	}
 
 	response.OkWithData(gin.H{
-		"title":   title,
-		"content": content,
+		"chunks": chunks,
 	}, c)
 }
 

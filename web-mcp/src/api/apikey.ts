@@ -22,7 +22,7 @@ export interface APIKeyCreateResponse {
 }
 
 // 获取 API Key 列表
-export const getAPIKeys = (): Promise<ApiResponse<APIKey[]>> => {
+export const getAPIKeys = (): Promise<APIKey[]> => {
   return service({
     url: '/api-keys/list',
     method: 'get'
@@ -30,7 +30,7 @@ export const getAPIKeys = (): Promise<ApiResponse<APIKey[]>> => {
 }
 
 // 创建 API Key
-export const createAPIKey = (data: APIKeyCreateRequest): Promise<ApiResponse<APIKeyCreateResponse>> => {
+export const createAPIKey = (data: APIKeyCreateRequest): Promise<APIKeyCreateResponse> => {
   return service({
     url: '/api-keys/create',
     method: 'post',
@@ -39,7 +39,7 @@ export const createAPIKey = (data: APIKeyCreateRequest): Promise<ApiResponse<API
 }
 
 // 删除 API Key
-export const deleteAPIKey = (id: number): Promise<ApiResponse<null>> => {
+export const deleteAPIKey = (id: number): Promise<null> => {
   return service({
     url: `/api-keys/${id}`,
     method: 'delete'

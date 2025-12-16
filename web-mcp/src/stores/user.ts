@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import request from '@/utils/request'
+import { getSSOLoginUrl } from '@/api/auth'
 import { accessToken, setAccessToken, clearAccessToken, initAccessToken } from '@/utils/token'
 
 // 用户信息接口
@@ -82,22 +83,13 @@ export async function fetchUserInfo() {
   if (!accessToken.value) return
   
   try {
-    const res: any = await request.get('/user/info')
-    if (res.code === 0 && res.data) {
-      const userInfo = res.data
-      user.value = {
-        email: userInfo.email || userInfo.nickname || '',
-        plan: 'FREE',
-        team: userInfo.nickname || 'Personal'
-      }
-      localStorage.setItem('user', JSON.stringify(user.value))
-    } else {
-      // token 无效，清除登录状态
-      console.error('获取用户信息失败:', res.msg)
-      user.value = null
-      clearAccessToken()
-      localStorage.removeItem('user')
+    const userInfo: any = await request.get('/user/info')
+    user.value = {
+      email: userInfo.email || userInfo.nickname || '',
+      plan: 'FREE',
+      team: userInfo.nickname || 'Personal'
     }
+    localStorage.setItem('user', JSON.stringify(user.value))
   } catch (e) {
     console.error('获取用户信息失败:', e)
     // 网络错误时不清除状态，使用缓存的用户信息
@@ -123,20 +115,15 @@ export function switchTeam(teamName: string) {
 // 跳转到 SSO 登录
 export async function redirectToSSO(returnUrl?: string) {
   try {
-    const redirectUri = encodeURIComponent(window.location.origin + '/sso-callback')
-    const returnPath = encodeURIComponent(returnUrl || window.location.pathname)
+    // 不需要手动编码，axios 会自动编码 params
+    const redirectUri = window.location.origin + '/sso-callback'
+    const returnPath = returnUrl || window.location.pathname
     
-    const res: any = await request.get(`/auth/sso_login_url?redirect_uri=${redirectUri}&return_url=${returnPath}`)
-    
-    if (res.code === 0 && res.data.sso_login_url) {
-      window.location.href = res.data.sso_login_url
-    } else {
-      console.error('获取 SSO 登录地址失败:', res.msg)
-      alert('获取登录地址失败，请稍后重试')
-    }
+    const res = await getSSOLoginUrl(redirectUri, returnPath)
+    window.location.href = res.sso_login_url
   } catch (error) {
     console.error('获取 SSO 登录 URL 失败:', error)
-    alert('登录服务异常，请稍后重试')
+    // 错误已由拦截器显示
   }
 }
 
