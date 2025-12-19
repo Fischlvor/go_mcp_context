@@ -8,6 +8,8 @@
 
 私有化的 Context7 替代方案，为企业内网的 AI IDE 提供实时、准确的技术文档和代码示例
 
+🌐 **在线体验**: [https://mcp.hsk423.cn](https://mcp.hsk423.cn)
+
 </div>
 
 ---
