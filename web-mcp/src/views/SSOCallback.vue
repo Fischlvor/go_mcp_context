@@ -11,6 +11,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useUser, fetchUserInfo } from '@/stores/user'
 import { handleSSOCallback } from '@/api/auth'
 
@@ -26,7 +27,7 @@ onMounted(async () => {
 
     if (!code) {
       console.error('登录失败：未获取到授权码')
-      alert('登录失败：未获取到授权码')
+      ElMessage.error('登录失败：未获取到授权码')
       router.push('/')
       return
     }
@@ -62,7 +63,7 @@ onMounted(async () => {
     router.push(returnUrl)
   } catch (error) {
     console.error('SSO 回调处理失败:', error)
-    alert('登录处理失败，请重试')
+    ElMessage.error('登录处理失败，请重试')
     router.push('/')
   }
 })

@@ -19,7 +19,7 @@ postgres:
 redis:
   address: localhost:6379
   password: ""
-  db: 0
+  db: 3
 
 embedding:
   provider: openai

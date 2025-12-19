@@ -127,48 +127,27 @@ func (l *OpenAILLM) renderEnrichPrompt(input EnrichInput) (string, error) {
 }
 
 // enrichPromptTemplate Enrich 提示词模板
-const enrichPromptTemplate = `你是一个技术文档专家，负责为代码片段生成结构化的描述信息。
+const enrichPromptTemplate = `You are a technical documentation expert. Generate a title and description for the following code snippet.
 
-请分析以下代码片段，生成符合 Context7 格式的结构化输出。
-
-## 输入信息
-
-**文件来源：** {{.Source}}
-**代码语言：** {{.Language}}
-**原始内容：**
+## Code Snippet
+---
 {{.Content}}
+---
 
-## 输出要求
+## Context
+- Section hierarchy: {{.Headers}}
 
-请返回 JSON 格式，包含以下字段：
-
+## Return JSON:
 {
-  "title": "简洁的标题，描述这段代码做什么（英文，使用动词开头，如 'Create...', 'Configure...', 'Handle...'）",
-  "description": "1-3 句话的描述，说明代码的用途和使用场景（英文）",
-  "content_type": "code 或 info（code 表示包含可执行代码示例，info 表示概念说明或配置指南）",
-  "language": "代码语言（如 js, ts, go, python, markdown 等）"
+  "title": "Concise title (5-15 words) describing the core functionality",
+  "description": "Description (50-150 words): 1) What it does 2) When to use it 3) Key points"
 }
 
-## 生成规则
-
-### Title 规则：
-- 使用动词开头：Create, Configure, Handle, Implement, Define, Set up, etc.
-- 简洁明了，不超过 80 个字符
-- 如果是 API 文档，包含函数/方法名
-- 如果是配置，说明配置什么
-
-### Description 规则：
-- 第一句说明代码做什么
-- 第二句说明什么场景使用
-- 第三句（可选）说明注意事项或最佳实践
-- 使用第三人称描述（This code..., This configuration..., This example...）
-- 不超过 200 个字符
-
-### Content Type 规则：
-- code：包含可执行的代码示例（函数、类、配置代码等）
-- info：概念说明、最佳实践、架构指南、无代码的文档
-
-请严格按照 JSON 格式返回，不要包含其他内容。`
+## Rules
+- title: Clear and concise, describe the core functionality of this code
+- description: Explain what it does, when to use it, and key points
+- **Keep the same language as the original document** (if the doc is in English, respond in English; if in Chinese, respond in Chinese)
+- Return strict JSON only, no other content`
 
 // 确保 OpenAILLM 实现了 LLMService 接口
 var _ LLMService = (*OpenAILLM)(nil)

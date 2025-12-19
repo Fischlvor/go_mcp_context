@@ -8,6 +8,8 @@
 
 私有化的 Context7 替代方案，为企业内网的 AI IDE 提供实时、准确的技术文档和代码示例
 
+🌐 **在线体验**: [https://mcp.hsk423.cn](https://mcp.hsk423.cn)
+
 </div>
 
 ---
@@ -308,11 +310,99 @@ go-mcp-context/
 - [ ] PDF/DOCX 解析
 - [x] 混合搜索（向量 + BM25）
 - [x] 重排序算法（3 指标）
-- [ ] Redis 缓存优化
+- [x] Redis 缓存优化（Embedding 缓存 + 搜索结果缓存 + GetOrSet 模式）
 - [x] 前端搜索结果展示
 - [ ] MCP IDE 集成测试
 
 ## 📝 开发日志
+
+### 2025-12-19
+
+#### Added
+- **无感知更新（Transactional Document Refresh）**
+  - `DocumentChunk` 新增 `BatchVersion` 字段，支持版本化原子切换
+  - 新增 `ProcessDocumentForRefresh()` 方法，返回 chunks 而非直接写库
+  - 重写 `RefreshVersionWithCallback()`：先生成 pending chunks → 原子切换 → 软删除旧数据
+  - 刷新过程中检索不受影响，用户无感知
+
+- **版本刷新 SSE 实时进度推送**
+  - 新增 `RefreshVersionSSE` API 端点 (`POST /libraries/:id/versions/:version/refresh-sse`)
+  - 新增 `library_refresh_sse.go` 定义 `RefreshStatus` 结构和 SSE 写入器
+  - 前端 `admin.vue` 新增刷新进度弹窗：进度条 + 文档状态列表
+
+- **七牛云存储 Download 方法实现**
+  - `qiniu.go` 实现 `Download()` 方法，通过 HTTP 获取文件内容
+  - 修复文档刷新时从本地读取改为云存储下载
+
+#### Changed
+- **Processor 重构**
+  - 提取 `processDocumentCore()` 公共方法，`ProcessDocument` 和 `ProcessDocumentForRefresh` 复用
+  - 避免代码重复
+
+- **GetVersions 统计修复**
+  - `TokenCount` 和 `ChunkCount` 从硬编码 0 改为数据库聚合计算 (`SUM`)
+
+- **Document List 接口优化**
+  - 不传 `version` 时自动使用 `library.DefaultVersion`
+  - 修复 GORM 链问题：使用 `Session()` 克隆避免 `Count()` 影响 `Find()`
+
+---
+
+### 2025-12-18
+
+#### Added
+- **多 Topic 搜索 + RRF 合并**
+  - 支持逗号/空格分隔的多 topic 查询：`routing, middleware, binding`
+  - 每个 topic 独立搜索，使用 Reciprocal Rank Fusion (RRF) 算法合并结果
+  - RRF 公式：`score(d) = Σ 1/(k + rank)`，k=60（Elasticsearch 默认值）
+  - 并行搜索：多个 topic 并发执行，提升响应速度
+
+- **搜索结果缓存**
+  - 每个子 topic 的搜索结果独立缓存，支持跨查询复用
+  - 缓存 Key 格式（递进关系）：`search:topic:{library_id}:{version}:{mode}:{topic_hash}`
+  - TTL：24 小时
+  - 性能提升：多 topic 热启动快 20 倍（0.82s → 0.04s）
+
+- **通用缓存工具 `GetOrSet[T]`**
+  - 实现 Cache-Aside Pattern（旁路缓存模式）
+  - 泛型支持，自动处理缓存命中/未命中逻辑
+  - 位置：`pkg/cache/cache.go`
+
+- **Redis 升级到 v9**
+  - 统一使用 `github.com/redis/go-redis/v9`
+  - 支持 Context 参数
+  - `NewRedisCacheWithClient()` 复用全局 Redis 客户端
+
+#### Changed
+- **全局变量新增 `global.Cache`**
+  - 通用缓存接口，用于搜索结果缓存等场景
+  - 初始化顺序：Redis → Cache → Embedding
+
+---
+
+### 2025-12-17
+
+#### Added
+- **文档处理流程重构（参考 Context7 和业界最佳实践）**
+  - 新增 Pre-Chunking 预处理：移除徽章、HTML 标签、空白行等无效内容
+  - 新增 LLM Enrich 阶段：使用 LLM 为每个块生成 Title 和 Description
+  - 处理流程：Parse → Pre-Process → Chunk → Enrich → Embed → Store
+
+- **Markdown 分块逻辑优化**
+  - 修复空标题问题：从标题行之后开始提取内容，跳过只有标题没有内容的 section
+  - 简化 ChunkType：只保留 `code` 和 `info` 两种类型（有代码块 → code，无 → info）
+  - 标题层级传递：空标题的 headers 会传递给下一个有内容的 section
+
+- **LLM Service 更新**
+  - 简化 `EnrichInput`：Content、Headers、Language、Source
+  - 简化 `EnrichOutput`：只返回 Title 和 Description
+  - 优化提示词：中文输出，简洁明了
+
+#### Changed
+- **处理流程进度调整**
+  - parsing: 5% → preprocessing: 10% → chunking: 20% → enriching: 35% → embedding: 60% → saving: 85% → completed: 100%
+
+---
 
 ### 2025-12-16 (续)
 
@@ -546,7 +636,7 @@ go-mcp-context/
   - 页面：`layout`、`library`、`search`、`dashboard`
   - API 接口：`search.ts`、`document.ts`、`library.ts`、`apikey.ts`
 
-### 2025-12-02 ~ 2025-12-03
+### 2025-12-02
 
 #### Added
 - **后端基础架构**

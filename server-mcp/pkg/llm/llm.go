@@ -14,15 +14,12 @@ type LLMService interface {
 
 // EnrichInput Enrich 输入
 type EnrichInput struct {
-	Source   string // 文件来源路径
-	Language string // 代码语言
-	Content  string // 原始内容
+	Content string // 原始内容（不含标题行）
+	Headers string // 标题层级（如：Gin Web Framework > Getting Started > Installation）
 }
 
 // EnrichOutput Enrich 输出（Context7 风格）
 type EnrichOutput struct {
-	Title       string `json:"title"`        // 标题
-	Description string `json:"description"`  // 描述
-	ContentType string `json:"content_type"` // code 或 info
-	Language    string `json:"language"`     // 代码语言
+	Title       string `json:"title"`       // 简洁标题（5-15字）
+	Description string `json:"description"` // 描述（50-150字）
 }
