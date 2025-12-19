@@ -146,16 +146,88 @@
                 </div>
               </div>
               <!-- 工具栏 -->
-              <div class="flex flex-wrap gap-2.5 sm:gap-1.5">
+              <div class="flex flex-wrap items-center gap-2.5 sm:gap-1.5">
+                <!-- 刷新按钮 -->
                 <button 
                   class="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-stone-300 text-base text-stone-500 transition hover:border-stone-400 w-8"
-                  @click="fetchDocument"
+                  @click="handleSearch"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-stone-500">
                     <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path>
                     <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path>
                   </svg>
                 </button>
+                
+                <!-- 版本选择下拉框 -->
+                <div class="relative">
+                  <button 
+                    class="flex h-8 items-center gap-1.5 rounded-lg border border-stone-300 px-3 text-sm text-stone-600 transition hover:border-stone-400 hover:bg-stone-50"
+                    @click="showVersionDropdown = !showVersionDropdown"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-stone-500">
+                      <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"></path>
+                      <path d="M12 3l0 6"></path>
+                      <path d="M12 15l0 6"></path>
+                    </svg>
+                    <span>{{ currentVersionDisplay }}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-stone-400">
+                      <path d="M6 9l6 6l6 -6"></path>
+                    </svg>
+                  </button>
+                  
+                  <!-- 下拉菜单 -->
+                  <div 
+                    v-if="showVersionDropdown" 
+                    class="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-stone-200 bg-white py-1 shadow-lg"
+                  >
+                    <!-- Latest (默认版本) 选项 -->
+                    <button 
+                      class="mx-1 my-0.5 flex w-[calc(100%-8px)] cursor-pointer items-center gap-1.5 rounded-md px-4 py-2 text-sm text-stone-700 transition-all duration-150 hover:bg-stone-50"
+                      :class="{ 'bg-stone-100': isLatestVersion }"
+                      @click="selectVersion('')"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-stone-500">
+                        <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"></path>
+                        <path d="M12 3l0 6"></path>
+                        <path d="M12 15l0 6"></path>
+                      </svg>
+                      <span class="truncate" :title="library.default_version">{{ library.default_version }}</span>
+                    </button>
+                    
+                    <!-- 版本列表 -->
+                    <button 
+                      v-for="ver in sortedVersions" 
+                      :key="ver"
+                      class="mx-1 my-0.5 flex w-[calc(100%-8px)] cursor-pointer items-center gap-1.5 rounded-md px-4 py-2 text-sm text-stone-700 transition-all duration-150 hover:bg-stone-50"
+                      :class="{ 'bg-stone-100': isCurrentVersion(ver) }"
+                      @click="selectVersion(ver)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-stone-500">
+                        <path d="M7 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
+                        <path d="M7 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
+                        <path d="M17 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>
+                        <path d="M7 8l0 8"></path>
+                        <path d="M7 8a4 4 0 0 0 4 4h4"></path>
+                      </svg>
+                      <span class="truncate" :title="ver">{{ ver }}</span>
+                    </button>
+                    
+                    <!-- 分隔线 -->
+                    <div class="mx-1 my-1 h-px border-t border-stone-200"></div>
+                    
+                    <!-- New Version 按钮 -->
+                    <button 
+                      class="mx-1 my-0.5 flex w-[calc(100%-8px)] cursor-pointer items-center gap-1.5 rounded-md px-4 py-2 text-sm text-stone-700 transition-all duration-150 hover:bg-stone-50"
+                      @click="openAddVersionModal"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-stone-500">
+                        <path d="M12 5l0 14"></path>
+                        <path d="M5 12l14 0"></path>
+                      </svg>
+                      <span>New Version</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="border-t border-stone-300"></div>
@@ -206,9 +278,6 @@
               <div class="w-full rounded-3xl border border-stone-300 bg-white p-6 shadow-sm sm:p-8">
                 <div class="mb-4 flex flex-col flex-wrap items-start justify-between gap-3 sm:flex-row sm:items-center">
                   <div class="flex items-center gap-2">
-                    <span v-if="hasSearched && searchResults.length > 0" class="text-sm text-stone-500">
-                      {{ searchResults.length }} results
-                    </span>
                   </div>
                   <div class="flex h-8 w-full flex-wrap gap-[1px] overflow-hidden rounded-lg sm:w-auto">
                     <button 
@@ -224,50 +293,8 @@
                   </div>
                 </div>
                 
-                <!-- 搜索结果列表 -->
-                <div v-if="searchResults.length > 0" class="space-y-6 max-h-[500px] overflow-y-auto">
-                  <div 
-                    v-for="result in searchResults" 
-                    :key="result.chunk_id"
-                    class="border-b border-stone-200 pb-6 last:border-b-0"
-                  >
-                    <!-- 标题 -->
-                    <h3 v-if="result.title" class="text-lg font-semibold text-stone-800 mb-2">
-                      {{ result.title }}
-                    </h3>
-                    
-                    <!-- 来源和元信息 -->
-                    <div class="flex flex-wrap items-center gap-3 text-sm text-stone-500 mb-3">
-                      <span v-if="result.source" class="flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
-                          <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
-                        </svg>
-                        {{ result.source }}
-                      </span>
-                      <span class="flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M4 7h16"></path>
-                          <path d="M4 11h16"></path>
-                          <path d="M4 15h16"></path>
-                          <path d="M4 19h16"></path>
-                        </svg>
-                        {{ result.tokens }} tokens
-                      </span>
-                      <span class="flex items-center gap-1 text-emerald-600">
-                        {{ (result.relevance * 100).toFixed(0) }}% match
-                      </span>
-                    </div>
-                    
-                    <!-- 内容 -->
-                    <div class="rounded-lg bg-stone-50 p-4 overflow-x-auto">
-                      <pre class="whitespace-pre-wrap font-mono text-sm text-stone-700">{{ result.content }}</pre>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- 无搜索结果或初始状态 -->
-                <div v-else class="overflow-hidden rounded-xl">
+                <!-- 文档内容展示 -->
+                <div class="overflow-hidden rounded-xl">
                   <textarea 
                     readonly 
                     class="h-[250px] w-full overflow-auto bg-stone-100 p-3 align-top font-mono text-xs text-stone-800 focus:outline-none sm:h-[350px] md:h-[434px] md:p-5 md:text-sm" 
@@ -410,29 +437,71 @@
 
     <!-- Footer -->
     <AppFooter />
+
+    <!-- Add Version Modal -->
+    <div v-if="showAddVersionModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showAddVersionModal = false">
+      <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+        <div class="mb-4">
+          <h2 class="text-lg font-semibold text-stone-800">Add New Version</h2>
+          <p class="mt-1 text-sm text-stone-500">Create a new version for this library</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-stone-700">Version Name</label>
+          <input 
+            v-model="newVersionName"
+            type="text"
+            placeholder="e.g. 1.0.0 or v1.0.0"
+            class="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            @keyup.enter="handleAddVersion"
+          />
+          <p class="mt-1 text-xs text-stone-400">Version will be prefixed with 'v' if not already</p>
+        </div>
+        <div class="mt-6 flex gap-3 justify-end">
+          <button 
+            class="px-4 py-2 rounded-lg border border-stone-300 text-sm font-medium text-stone-700 hover:bg-stone-50"
+            @click="showAddVersionModal = false"
+          >
+            Cancel
+          </button>
+          <button 
+            class="px-4 py-2 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            :disabled="!newVersionName.trim()"
+            @click="handleAddVersion"
+          >
+            Create Version
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 点击外部关闭下拉框 -->
+    <div 
+      v-if="showVersionDropdown" 
+      class="fixed inset-0 z-40" 
+      @click="showVersionDropdown = false"
+    ></div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
-import { getLibrary } from '@/api/library'
-import { getLatestCode, getLatestInfo, getDocuments, uploadDocumentWithSSE } from '@/api/document'
-import { searchDocuments } from '@/api/search'
+import { getLibrary, createVersion } from '@/api/library'
+import { getDocuments, uploadDocumentWithSSE, getChunks } from '@/api/document'
 import type { Library } from '@/api/library'
-import type { SearchResultItem } from '@/api/search'
-
 const route = useRoute()
+const router = useRouter()
 const { isLoggedIn, userEmail, userPlan, initUserState, redirectToSSO } = useUser()
 
 const libraryId = computed(() => Number(route.params.id))
 const version = computed(() => {
-  // 从路由获取版本，如果没有则使用库的默认版本
+  // 从路由获取版本，如果没有则返回 undefined（让后端使用默认版本）
   const routeVersion = route.params.version as string | undefined
-  return routeVersion || library.value.default_version || undefined
+  return routeVersion || undefined
 })
 const library = ref<Library>({
   id: 0,
@@ -455,10 +524,7 @@ const searchTopic = ref('')
 const searchMode = ref<'code' | 'info'>('code')
 const searching = ref(false)
 const searchResult = ref('Loading document...')
-const searchResults = ref<SearchResultItem[]>([])
 const hasSearched = ref(false)
-const currentDocTitle = ref('')
-const loadingDoc = ref(false)
 const expandDescription = ref(false)
 
 // Documents tab
@@ -473,6 +539,83 @@ const uploading = ref(false)
 const uploadProgress = ref(0)
 const uploadMessage = ref('')
 
+// 版本选择
+const showVersionDropdown = ref(false)
+const showAddVersionModal = ref(false)
+const newVersionName = ref('')
+
+// 当前版本显示
+const currentVersionDisplay = computed(() => {
+  const routeVersion = route.params.version as string | undefined
+  // 如果路由没有指定版本，显示默认版本
+  if (!routeVersion) {
+    return library.value.default_version || 'Latest'
+  }
+  return routeVersion
+})
+
+// 排序后的版本列表（不包含默认版本）
+const sortedVersions = computed(() => {
+  const versions = library.value.versions || []
+  return versions.filter(v => v !== library.value.default_version)
+})
+
+// 判断是否是最新版本（默认版本）
+const isLatestVersion = computed(() => {
+  // 如果路由没有指定版本，或者版本等于默认版本，则是最新版本
+  const routeVersion = route.params.version as string | undefined
+  return !routeVersion || routeVersion === library.value.default_version
+})
+
+// 判断是否是当前版本
+const isCurrentVersion = (ver: string) => {
+  const routeVersion = route.params.version as string | undefined
+  return ver === routeVersion
+}
+
+// 选择版本
+const selectVersion = (ver: string) => {
+  showVersionDropdown.value = false
+  if (ver === '' || ver === library.value.default_version) {
+    // 选择默认版本，不带 version 参数
+    router.push(`/libraries/${libraryId.value}`)
+  } else {
+    router.push(`/libraries/${libraryId.value}/${ver}`)
+  }
+}
+
+// 打开添加版本弹窗
+const openAddVersionModal = () => {
+  showVersionDropdown.value = false
+  showAddVersionModal.value = true
+}
+
+// 创建新版本
+const handleAddVersion = async () => {
+  if (!newVersionName.value.trim()) {
+    ElMessage.warning('Please enter a version name')
+    return
+  }
+
+  // 自动添加 v 前缀
+  let versionWithPrefix = newVersionName.value.trim()
+  if (!versionWithPrefix.startsWith('v')) {
+    versionWithPrefix = 'v' + versionWithPrefix
+  }
+
+  try {
+    await createVersion(libraryId.value, versionWithPrefix)
+    showAddVersionModal.value = false
+    newVersionName.value = ''
+    // 刷新库信息以获取新版本列表
+    await fetchLibrary()
+    // 跳转到新版本
+    router.push(`/libraries/${libraryId.value}/${versionWithPrefix}`)
+  } catch (error) {
+    console.error('Failed to create version:', error)
+  }
+}
+
 const handleSignIn = () => {
   redirectToSSO()
 }
@@ -480,25 +623,6 @@ const handleSignIn = () => {
 const fetchLibrary = async () => {
   const library_data = await getLibrary(libraryId.value)
   library.value = library_data
-}
-
-// 加载文档内容（根据 searchMode 切换 code/info）
-const fetchDocument = async () => {
-  loadingDoc.value = true
-  searchResult.value = 'Loading document...'
-  
-  try {
-    // 根据 searchMode 获取对应类型的文档块
-    const res = searchMode.value === 'info' 
-      ? await getLatestInfo(libraryId.value, version.value)
-      : await getLatestCode(libraryId.value, version.value)
-    currentDocTitle.value = res.title
-    searchResult.value = res.content || 'No content available. Upload a document to get started.'
-  } catch (error) {
-    searchResult.value = 'Failed to load document.'
-  } finally {
-    loadingDoc.value = false
-  }
 }
 
 // 加载文档列表
@@ -527,7 +651,7 @@ const handleFileUpload = async (event: Event) => {
   const allowedTypes = ['.md', '.pdf', '.docx']
   const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
   if (!allowedTypes.includes(ext)) {
-    alert('Only .md, .pdf, .docx formats are supported')
+    ElMessage.warning('Only .md, .pdf, .docx formats are supported')
     return
   }
 
@@ -581,7 +705,7 @@ const handleFileUpload = async (event: Event) => {
             displayMsg = `Error (${code}): ${displayMsg}`
           }
           
-          alert('Upload failed:\n' + displayMsg)
+          ElMessage.error('Upload failed: ' + displayMsg)
           uploading.value = false
           uploadProgress.value = 0
           uploadMessage.value = ''
@@ -590,7 +714,7 @@ const handleFileUpload = async (event: Event) => {
       uploadVersion
     )
   } catch (error) {
-    alert('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    ElMessage.error('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
     uploading.value = false
     uploadProgress.value = 0
     uploadMessage.value = ''
@@ -600,55 +724,56 @@ const handleFileUpload = async (event: Event) => {
 }
 
 const handleSearch = async () => {
-  if (!searchTopic.value.trim()) {
-    searchResult.value = 'Please enter a topic to search.'
-    searchResults.value = []
-    hasSearched.value = false
-    return
-  }
-  
   searching.value = true
   hasSearched.value = true
-  searchResults.value = []
-  searchResult.value = 'Searching...'
   
   try {
-    const res = await searchDocuments({
-      library_id: libraryId.value,
-      query: searchTopic.value,
-      mode: searchMode.value,
-      limit: 10
+    // 调用统一的 getChunks API，通过 topic 参数控制是否搜索
+    const res = await getChunks(searchMode.value, libraryId.value, {
+      version: version.value, // 传入版本参数
+      topic: searchTopic.value.trim() || undefined // 空字符串转为 undefined，返回全部文档
     })
     
-    if (res.results.length > 0) {
-      searchResults.value = res.results
-      searchResult.value = '' // 清空旧的文本结果
+    const chunks = (res.chunks || []) as any[]
+    if (chunks.length > 0) {
+      // 格式化为 ---- 分割的文本格式
+      // code mode: title → source → description → code
+      // info mode: title → source → description (content)
+      const formatted = chunks.map((chunk: any) => {
+        let text = ''
+        if (chunk.title) text += `### ${chunk.title}\n\n`
+        if (chunk.source) text += `Source: ${chunk.source}\n\n`
+        if (chunk.description) text += `${chunk.description}\n\n`
+        // code mode: 显示代码块（带语言标记）
+        // info mode: 显示 chunk_text 原文
+        if (searchMode.value === 'code') {
+          if (chunk.code) {
+            const lang = chunk.language || ''
+            text += `\`\`\`${lang}\n${chunk.code}\n\`\`\``
+          }
+        } else {
+          if (chunk.chunk_text) text += chunk.chunk_text
+        }
+        return text.trim()
+      }).join('\n\n--------------------------------\n\n')
+      searchResult.value = formatted
     } else {
-      searchResults.value = []
-      searchResult.value = `No results found for "${searchTopic.value}".`
+      if (searchTopic.value.trim()) {
+        searchResult.value = `No results found for "${searchTopic.value}".`
+      } else {
+        searchResult.value = 'No documents found.'
+      }
     }
   } catch (error) {
-    searchResults.value = []
     searchResult.value = 'Search failed. Please try again.'
+    console.error('Search error:', error)
   } finally {
     searching.value = false
   }
 }
 
 const copyContent = () => {
-  // 如果有搜索结果，复制格式化的结果
-  if (searchResults.value.length > 0) {
-    const formatted = searchResults.value.map(r => {
-      let text = ''
-      if (r.title) text += `### ${r.title}\n\n`
-      if (r.source) text += `Source: ${r.source}\n\n`
-      text += r.content
-      return text
-    }).join('\n\n--------------------------------\n\n')
-    navigator.clipboard.writeText(formatted)
-  } else {
-    navigator.clipboard.writeText(searchResult.value)
-  }
+  navigator.clipboard.writeText(searchResult.value)
 }
 
 const formatNumber = (num: number) => {
@@ -709,7 +834,7 @@ const getTruncatedText = (text: string | undefined) => {
 onMounted(async () => {
   initUserState()
   await fetchLibrary()
-  fetchDocument()
+  handleSearch()
 })
 
 // 监听 activeTab 变化，切换到 documents 时加载文档列表
@@ -719,17 +844,16 @@ watch(activeTab, (newTab) => {
   }
 })
 
-// 监听版本变化，重新加载文档
-watch(() => route.params.version, () => {
-  fetchDocument()
-  // 如果在 documents tab，也重新加载文档列表
-  if (activeTab.value === 'documents') {
-    fetchDocumentsList()
+// 监听版本和 searchMode 变化，统一调用 handleSearch
+// handleSearch 会根据 searchTopic 是否有值决定是搜索还是获取全部文档
+watch(
+  [() => route.params.version, searchMode],
+  () => {
+    handleSearch()
+    // 如果在 documents tab，也重新加载文档列表
+    if (activeTab.value === 'documents') {
+      fetchDocumentsList()
+    }
   }
-})
-
-// 监听 searchMode 变化，重新加载文档
-watch(searchMode, () => {
-  fetchDocument()
-})
+)
 </script>

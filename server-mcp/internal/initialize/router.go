@@ -4,10 +4,12 @@ import (
 	"go-mcp-context/internal/middleware"
 	"go-mcp-context/internal/router"
 	"go-mcp-context/pkg/global"
+	"strconv"
 
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // InitRouter 初始化路由
@@ -15,13 +17,27 @@ func InitRouter() *gin.Engine {
 	// gin.Default() 已包含 Logger 和 Recovery 中间件
 	r := gin.Default()
 
-	// 初始化 Session 中间件（用于存储 refresh_token）
-	store := cookie.NewStore([]byte(global.Config.SSO.SessionsSecret))
+	// 初始化 Session 中间件（使用 Redis 存储 refresh_token）
+	store, err := redis.NewStoreWithDB(
+		10,
+		"tcp",
+		global.Config.Redis.Address,
+		"",                                   // username
+		global.Config.Redis.Password,         // password
+		strconv.Itoa(global.Config.Redis.DB), // db
+		[]byte(global.Config.SSO.SessionsSecret),
+	)
+	if err != nil {
+		global.Log.Error("初始化 Redis session store 失败", zap.Error(err))
+		panic(err)
+	}
+
 	store.Options(sessions.Options{
 		Path:     "/",
 		MaxAge:   7 * 24 * 3600, // 7 天
 		HttpOnly: true,
 		Secure:   global.Config.System.Env == "release",
+		SameSite: 3, // SameSite=Lax
 	})
 	r.Use(sessions.Sessions("mcp_session", store))
 
@@ -38,8 +54,8 @@ func InitRouter() *gin.Engine {
 	{
 		routerGroup.InitAuthRouter(v1Public)           // 认证相关（SSO 登录、回调、登出）
 		routerGroup.InitLibraryPublicRouter(v1Public)  // GET 库列表、详情
-		routerGroup.InitDocumentPublicRouter(v1Public) // GET 文档详情
-		routerGroup.InitSearchPublicRouter(v1Public)   // POST 搜索
+		routerGroup.InitDocumentPublicRouter(v1Public) // GET 文档详情（含搜索，通过 topic 参数）
+		// routerGroup.InitSearchPublicRouter(v1Public) // 已废弃，搜索功能合并到 GetChunks
 	}
 
 	// API v1 私有路由（需要 SSO JWT 认证）- 增删改接口

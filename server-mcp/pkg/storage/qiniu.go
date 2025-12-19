@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -102,9 +103,25 @@ func (q *QiniuStorage) Upload(ctx context.Context, key string, reader io.Reader,
 
 // Download 下载文件
 func (q *QiniuStorage) Download(ctx context.Context, key string) (io.ReadCloser, error) {
-	// 七牛云下载需要通过 URL 访问
-	// 这里返回一个简单的实现，实际使用时可能需要 HTTP 客户端
-	return nil, fmt.Errorf("download not implemented, use GetPublicURL or GetSignedURL to get download URL")
+	// 通过公开 URL 下载文件
+	url := q.GetPublicURL(key)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request failed: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download failed: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("download failed: status %d", resp.StatusCode)
+	}
+
+	return resp.Body, nil
 }
 
 // Delete 删除文件

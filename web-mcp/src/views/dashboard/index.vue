@@ -430,6 +430,7 @@
 
 <script setup lang="ts">
 import { ref, computed, h, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
@@ -490,7 +491,7 @@ const handleDeleteKey = async (id: number) => {
 const copyNewKey = () => {
   if (newlyCreatedKey.value) {
     navigator.clipboard.writeText(newlyCreatedKey.value.api_key)
-    alert('已复制到剪贴板')
+    ElMessage.success('已复制到剪贴板')
   }
 }
 

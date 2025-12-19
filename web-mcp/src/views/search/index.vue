@@ -83,10 +83,23 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { getLibraries } from '@/api/library'
-import { searchDocuments } from '@/api/search'
+import { getChunks } from '@/api/document'
 import type { LibraryListItem } from '@/api/library'
-import type { SearchResultItem } from '@/api/search'
+import type { DocumentChunk } from '@/api/document'
 import { ElMessage } from 'element-plus'
+
+// 搜索结果项类型
+interface SearchResultItem {
+  chunk_id: number
+  upload_id: number
+  library_id: number
+  version: string
+  title: string
+  source: string
+  content: string
+  tokens: number
+  relevance: number
+}
 
 const libraries = ref<LibraryListItem[]>([])
 const loading = ref(false)
@@ -121,16 +134,31 @@ const handleSearch = async () => {
   searched.value = true
   
   try {
-    const res = await searchDocuments({
-      library_id: searchForm.library_id,
-      query: searchForm.query,
-      mode: searchForm.mode || undefined,
-      page: searchForm.page,
-      limit: searchForm.limit
-    })
+    // 获取库信息获取默认版本
+    const lib = libraries.value.find(l => l.id === searchForm.library_id)
+    const version = lib?.default_version || undefined
     
-    results.value = res.results
-    total.value = res.total
+    // 调用统一的 getChunks API
+    const res = await getChunks(
+      (searchForm.mode as 'code' | 'info') || 'code',
+      searchForm.library_id,
+      { version, topic: searchForm.query }
+    )
+    
+    // 将 DocumentChunk 转换为 SearchResultItem 格式
+    const chunks = (res.chunks || []) as any[]
+    results.value = chunks.map(chunk => ({
+      chunk_id: chunk.id,
+      upload_id: chunk.upload_id,
+      library_id: chunk.library_id,
+      version: chunk.version,
+      title: chunk.title || 'Untitled',
+      source: chunk.source || '',
+      content: chunk.chunk_text || '',
+      tokens: chunk.tokens || 0,
+      relevance: chunk.relevance || 0
+    }))
+    total.value = res.total || chunks.length
   } finally {
     loading.value = false
   }
