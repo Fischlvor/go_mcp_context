@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,6 +16,8 @@ import (
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
 	"go-mcp-context/pkg/global"
+
+	"gorm.io/gorm"
 )
 
 type DocumentService struct{}
@@ -26,20 +27,29 @@ func (s *DocumentService) List(req *request.DocumentList) (*response.PageResult,
 	var documents []dbmodel.DocumentUpload
 	var total int64
 
-	db := global.DB.Model(&dbmodel.DocumentUpload{})
+	// 构建基础查询条件
+	baseQuery := global.DB.Model(&dbmodel.DocumentUpload{})
 
 	// 条件过滤
 	if req.LibraryID != nil && *req.LibraryID > 0 {
-		db = db.Where("library_id = ?", *req.LibraryID)
-	}
-	if req.Version != nil && *req.Version != "" {
-		db = db.Where("version = ?", *req.Version)
+		baseQuery = baseQuery.Where("library_id = ?", *req.LibraryID)
+
+		// 版本过滤：不传 version 时使用 library 的 default_version
+		if req.Version != nil && *req.Version != "" {
+			baseQuery = baseQuery.Where("version = ?", *req.Version)
+		} else {
+			// 查询 library 的 default_version
+			var library dbmodel.Library
+			if err := global.DB.Select("default_version").First(&library, *req.LibraryID).Error; err == nil {
+				baseQuery = baseQuery.Where("version = ?", library.DefaultVersion)
+			}
+		}
 	}
 	// 默认查询非删除状态的文档
-	db = db.Where("status != ?", "deleted")
+	baseQuery = baseQuery.Where("status != ?", "deleted")
 
-	// 计算总数
-	if err := db.Count(&total).Error; err != nil {
+	// 计算总数（使用 Session 克隆避免影响后续查询）
+	if err := baseQuery.Session(&gorm.Session{}).Count(&total).Error; err != nil {
 		return nil, err
 	}
 
@@ -54,7 +64,7 @@ func (s *DocumentService) List(req *request.DocumentList) (*response.PageResult,
 	}
 
 	offset := (page - 1) * pageSize
-	if err := db.Offset(offset).Limit(pageSize).Find(&documents).Error; err != nil {
+	if err := baseQuery.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&documents).Error; err != nil {
 		return nil, err
 	}
 
@@ -271,8 +281,14 @@ func (s *DocumentService) GetLatestContent(libraryID uint, version string) (stri
 		return "", "", ErrNotFound
 	}
 
-	// 读取文件内容
-	content, err := os.ReadFile(doc.FilePath)
+	// 从存储读取文件内容
+	reader, err := global.Storage.Download(context.Background(), doc.FilePath)
+	if err != nil {
+		return doc.Title, "", nil
+	}
+	defer reader.Close()
+
+	content, err := io.ReadAll(reader)
 	if err != nil {
 		return doc.Title, "", nil
 	}

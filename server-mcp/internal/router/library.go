@@ -24,11 +24,12 @@ func (l *LibraryRouter) InitLibraryRouter(Router *gin.RouterGroup) {
 	libraryRouter := Router.Group("libraries")
 	libraryApi := api.ApiGroupApp.LibraryApi
 	{
-		libraryRouter.POST("", libraryApi.Create)                                      // 创建
-		libraryRouter.PUT(":id", libraryApi.Update)                                    // 更新
-		libraryRouter.DELETE(":id", libraryApi.Delete)                                 // 删除
-		libraryRouter.POST(":id/versions", libraryApi.CreateVersion)                   // 创建版本
-		libraryRouter.DELETE(":id/versions/:version", libraryApi.DeleteVersion)        // 删除版本
-		libraryRouter.POST(":id/versions/:version/refresh", libraryApi.RefreshVersion) // 刷新版本
+		libraryRouter.POST("", libraryApi.Create)                                             // 创建
+		libraryRouter.PUT(":id", libraryApi.Update)                                           // 更新
+		libraryRouter.DELETE(":id", libraryApi.Delete)                                        // 删除
+		libraryRouter.POST(":id/versions", libraryApi.CreateVersion)                          // 创建版本
+		libraryRouter.DELETE(":id/versions/:version", libraryApi.DeleteVersion)               // 删除版本
+		libraryRouter.POST(":id/versions/:version/refresh", libraryApi.RefreshVersion)        // 刷新版本（异步）
+		libraryRouter.POST(":id/versions/:version/refresh-sse", libraryApi.RefreshVersionSSE) // 刷新版本（SSE 实时推送）
 	}
 }

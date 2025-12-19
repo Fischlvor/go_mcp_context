@@ -1,5 +1,6 @@
 import service from '@/utils/request'
 import type { ApiResponse } from '@/utils/request'
+import { createSSEPost, type SSEEvent } from '@/utils/sse'
 
 // 库列表项（精简字段，用于主页表格）
 export interface LibraryListItem {
@@ -112,10 +113,56 @@ export const deleteVersion = (libraryId: number, version: string): Promise<null>
   })
 }
 
-// 刷新版本
+// 刷新版本（异步）
 export const refreshVersion = (libraryId: number, version: string): Promise<null> => {
   return service({
     url: `/libraries/${libraryId}/versions/${version}/refresh`,
     method: 'post'
   })
+}
+
+// 刷新状态类型
+export interface RefreshStatus {
+  doc_id?: number
+  doc_title?: string
+  stage: 'started' | 'doc_processing' | 'doc_completed' | 'doc_failed' | 'all_completed' | 'error'
+  current: number
+  total: number
+  message: string
+}
+
+// 刷新版本（SSE 实时推送）
+export const refreshVersionWithSSE = (
+  libraryId: number,
+  version: string,
+  callbacks: {
+    onProgress?: (status: RefreshStatus) => void
+    onComplete?: (status: RefreshStatus) => void
+    onError?: (error: Error) => void
+  }
+): Promise<void> => {
+  return createSSEPost(
+    `/libraries/${libraryId}/versions/${version}/refresh-sse`,
+    {},
+    {
+      onMessage: (event: SSEEvent<RefreshStatus>) => {
+        console.log('[SSE Refresh] Received event:', event)
+        const stage = event.data.stage
+        
+        if (stage === 'all_completed') {
+          callbacks.onComplete?.(event.data)
+        } else if (stage === 'error' || stage === 'doc_failed') {
+          if (stage === 'error') {
+            callbacks.onError?.(new Error(event.data.message || 'Refresh failed'))
+          } else {
+            // doc_failed 只是单个文档失败，继续处理
+            callbacks.onProgress?.(event.data)
+          }
+        } else {
+          callbacks.onProgress?.(event.data)
+        }
+      },
+      onError: callbacks.onError,
+    }
+  )
 }

@@ -107,16 +107,23 @@ export const getDocument = (id: number): Promise<ApiResponse<Document>> => {
   })
 }
 
-// 获取库的文档块
+// 获取库的文档块（统一入口，支持搜索和列表）
 // mode: 'code' 返回代码块, 'info' 返回文档块
-export const getChunks = (mode: 'code' | 'info', libraryId: number, version?: string): Promise<ChunksResponse> => {
-  const url = version 
-    ? `/documents/chunks/${mode}/${libraryId}/${version}`
-    : `/documents/chunks/${mode}/${libraryId}`
+// version: 可选，不传则使用库的默认版本
+// topic: 可选，传入则进行向量搜索，不传则返回全部文档块
+export const getChunks = (
+  mode: 'code' | 'info', 
+  libraryId: number, 
+  options?: { version?: string; topic?: string }
+): Promise<ChunksResponse & { total?: number; topic?: string }> => {
+  const params: Record<string, string> = {}
+  if (options?.version) params.version = options.version
+  if (options?.topic) params.topic = options.topic
   
   return service({
-    url,
-    method: 'get'
+    url: `/documents/chunks/${mode}/${libraryId}`,
+    method: 'get',
+    params: Object.keys(params).length > 0 ? params : undefined
   })
 }
 
@@ -147,7 +154,7 @@ const formatInfoChunk = (chunk: DocumentChunk): string => {
 
 // 获取代码块内容（合并后）
 export const getLatestCode = async (libraryId: number, version?: string): Promise<DocumentContent> => {
-  const res = await getChunks('code', libraryId, version)
+  const res = await getChunks('code', libraryId, { version })
   const chunks = res.chunks || []
   const content = chunks.map(formatCodeChunk).join(CHUNK_SEPARATOR)
   const title = chunks.length > 0 ? chunks[0].title : ''
@@ -156,7 +163,7 @@ export const getLatestCode = async (libraryId: number, version?: string): Promis
 
 // 获取文档信息块内容（合并后）
 export const getLatestInfo = async (libraryId: number, version?: string): Promise<DocumentContent> => {
-  const res = await getChunks('info', libraryId, version)
+  const res = await getChunks('info', libraryId, { version })
   const chunks = res.chunks || []
   const content = chunks.map(formatInfoChunk).join(CHUNK_SEPARATOR)
   const title = chunks.length > 0 ? chunks[0].title : ''

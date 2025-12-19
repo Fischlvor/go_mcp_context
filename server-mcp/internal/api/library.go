@@ -189,3 +189,41 @@ func (l *LibraryApi) RefreshVersion(c *gin.Context) {
 
 	response.OkWithMessage("版本刷新已启动，请稍候", c)
 }
+
+// RefreshVersionSSE 刷新版本（SSE 实时推送处理状态）
+func (l *LibraryApi) RefreshVersionSSE(c *gin.Context) {
+	// 创建 SSE 写入器
+	sse, ok := response.NewSSEWriter(c)
+	if !ok {
+		c.JSON(500, gin.H{"error": "SSE not supported"})
+		return
+	}
+
+	// 解析参数
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		sse.SendError("无效的库ID")
+		return
+	}
+
+	version := c.Param("version")
+	if version == "" {
+		sse.SendError("版本不能为空")
+		return
+	}
+
+	// 创建状态通道
+	statusChan := make(chan response.RefreshStatus, 20)
+
+	// 启动后台处理
+	go libraryService.RefreshVersionWithCallback(uint(id), version, statusChan)
+
+	// 监听状态并推送 SSE
+	for status := range statusChan {
+		if status.Stage == "error" {
+			sse.SendError(status.Message)
+			return
+		}
+		sse.SendSuccess(status.Message, status)
+	}
+}

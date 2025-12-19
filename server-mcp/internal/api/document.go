@@ -156,9 +156,11 @@ func (d *DocumentApi) Get(c *gin.Context) {
 	response.OkWithData(doc, c)
 }
 
-// GetChunks 获取库的文档块
-// GET /documents/:mode/:libid/*version
-// mode: code 或 info, version 可选
+// GetChunks 获取库的文档块（统一入口，支持搜索和列表）
+// GET /documents/chunks/:mode/:libid?version=xxx&topic=xxx
+// mode: code 或 info
+// version: 可选，不传则使用库的默认版本
+// topic: 可选，传入则进行向量搜索，不传则返回全部文档块
 func (d *DocumentApi) GetChunks(c *gin.Context) {
 	mode := c.Param("mode") // code 或 info
 	if mode != "code" && mode != "info" {
@@ -172,11 +174,8 @@ func (d *DocumentApi) GetChunks(c *gin.Context) {
 		return
 	}
 
-	// 处理版本参数（*version 会带有前导斜杠）
-	version := c.Param("version")
-	if len(version) > 0 && version[0] == '/' {
-		version = version[1:]
-	}
+	// 从 query 参数获取版本
+	version := c.Query("version")
 
 	// 如果没有指定版本，使用库的默认版本
 	if version == "" {
@@ -188,12 +187,82 @@ func (d *DocumentApi) GetChunks(c *gin.Context) {
 		version = library.DefaultVersion
 	}
 
-	chunks, err := documentService.GetChunks(uint(libraryID), version, mode)
+	// 获取 topic 参数（可选）
+	topic := c.Query("topic")
+
+	// 如果有 topic，进行向量搜索
+	if topic != "" {
+		global.Log.Info("GetChunks: 执行向量搜索",
+			zap.Uint64("library_id", libraryID),
+			zap.String("mode", mode),
+			zap.String("topic", topic),
+		)
+
+		// 调用搜索服务
+		searchResult, err := searchService.SearchDocuments(&request.Search{
+			LibraryID: uint(libraryID),
+			Query:     topic,
+			Mode:      mode,
+			Version:   version, // 传入版本参数
+			Page:      1,
+			Limit:     50, // 搜索返回更多结果
+		})
+		if err != nil {
+			global.Log.Error("GetChunks: 搜索失败", zap.Error(err))
+			response.FailWithMessage("搜索失败: "+err.Error(), c)
+			return
+		}
+
+		// 将搜索结果转换为 chunks 格式
+		chunks := make([]gin.H, len(searchResult.Results))
+		for i, r := range searchResult.Results {
+			chunks[i] = gin.H{
+				"id":          r.ChunkID,
+				"library_id":  r.LibraryID,
+				"upload_id":   r.UploadID,
+				"version":     r.Version,
+				"title":       r.Title,
+				"description": r.Description, // code mode: LLM 生成, info mode: 空
+				"source":      r.Source,
+				"language":    r.Language, // code mode: 代码语言, info mode: 空
+				"code":        r.Code,     // code mode: 代码内容, info mode: 空
+				"chunk_text":  r.Content,  // 原文内容
+				"tokens":      r.Tokens,
+				"chunk_type":  mode,
+				"relevance":   r.Relevance,
+			}
+		}
+
+		response.OkWithData(gin.H{
+			"chunks": chunks,
+			"total":  searchResult.Total,
+			"topic":  topic,
+		}, c)
+		return
+	}
+
+	// 无 topic，返回全部文档块（最小所需字段）
+	dbChunks, err := documentService.GetChunks(uint(libraryID), version, mode)
 	if err != nil {
 		response.OkWithData(gin.H{
 			"chunks": []interface{}{},
 		}, c)
 		return
+	}
+
+	// 转换为最小所需字段格式
+	chunks := make([]gin.H, len(dbChunks))
+	for i, chunk := range dbChunks {
+		chunks[i] = gin.H{
+			"id":          chunk.ID,
+			"title":       chunk.Title,
+			"description": chunk.Description, // code mode: LLM 生成, info mode: 空
+			"source":      chunk.Source,
+			"language":    chunk.Language,  // code mode: 代码语言, info mode: 空
+			"code":        chunk.Code,      // code mode: 代码内容, info mode: 空
+			"chunk_text":  chunk.ChunkText, // 原文内容
+			"tokens":      chunk.Tokens,
+		}
 	}
 
 	response.OkWithData(gin.H{
