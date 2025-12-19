@@ -1,6 +1,10 @@
 package service
 
 import (
+	"context"
+	"fmt"
+	"io"
+	"log"
 	"regexp"
 	"time"
 
@@ -306,24 +310,65 @@ func (s *LibraryService) GetVersions(libraryID uint) ([]response.VersionInfo, er
 		return nil, ErrNotFound
 	}
 
+	// 查询每个版本的统计信息
+	type versionStats struct {
+		Version     string    `gorm:"column:version"`
+		TokenCount  int       `gorm:"column:token_count"`
+		ChunkCount  int       `gorm:"column:chunk_count"`
+		LastUpdated time.Time `gorm:"column:last_updated"`
+	}
+	var stats []versionStats
+	if err := global.DB.Table("document_uploads").
+		Select("version, COALESCE(SUM(token_count), 0) as token_count, COALESCE(SUM(chunk_count), 0) as chunk_count, MAX(updated_at) as last_updated").
+		Where("library_id = ? AND status != ?", libraryID, "deleted").
+		Group("version").
+		Find(&stats).Error; err != nil {
+		return nil, err
+	}
+
+	// 构建 version -> stats 映射
+	statsMap := make(map[string]versionStats)
+	for _, stat := range stats {
+		statsMap[stat.Version] = stat
+	}
+
 	var versions []response.VersionInfo
 
 	// 先添加 default_version
-	versions = append(versions, response.VersionInfo{
-		Version:     library.DefaultVersion,
-		TokenCount:  0,
-		ChunkCount:  0,
-		LastUpdated: library.UpdatedAt,
-	})
-
-	// 再添加 versions 数组中的所有版本（倒序）
-	for i := len(library.Versions) - 1; i >= 0; i-- {
+	if stat, ok := statsMap[library.DefaultVersion]; ok {
 		versions = append(versions, response.VersionInfo{
-			Version:     library.Versions[i],
+			Version:     library.DefaultVersion,
+			TokenCount:  stat.TokenCount,
+			ChunkCount:  stat.ChunkCount,
+			LastUpdated: stat.LastUpdated,
+		})
+	} else {
+		versions = append(versions, response.VersionInfo{
+			Version:     library.DefaultVersion,
 			TokenCount:  0,
 			ChunkCount:  0,
 			LastUpdated: library.UpdatedAt,
 		})
+	}
+
+	// 再添加 versions 数组中的所有版本（倒序）
+	for i := len(library.Versions) - 1; i >= 0; i-- {
+		v := library.Versions[i]
+		if stat, ok := statsMap[v]; ok {
+			versions = append(versions, response.VersionInfo{
+				Version:     v,
+				TokenCount:  stat.TokenCount,
+				ChunkCount:  stat.ChunkCount,
+				LastUpdated: stat.LastUpdated,
+			})
+		} else {
+			versions = append(versions, response.VersionInfo{
+				Version:     v,
+				TokenCount:  0,
+				ChunkCount:  0,
+				LastUpdated: library.UpdatedAt,
+			})
+		}
 	}
 
 	return versions, nil
@@ -411,7 +456,7 @@ func (s *LibraryService) DeleteVersion(libraryID uint, version string) error {
 	}
 
 	// 删除分块
-	if err := tx.Where("document_id IN ?", documentIDs).
+	if err := tx.Where("upload_id IN ?", documentIDs).
 		Delete(&dbmodel.DocumentChunk{}).Error; err != nil {
 		tx.Rollback()
 		return err
@@ -464,7 +509,7 @@ func (s *LibraryService) RefreshVersion(libraryID uint, version string) error {
 	// 对每个文档重新处理
 	for _, doc := range documents {
 		// 删除该文档的旧分块
-		if err := tx.Where("document_id = ?", doc.ID).
+		if err := tx.Where("upload_id = ?", doc.ID).
 			Delete(&dbmodel.DocumentChunk{}).Error; err != nil {
 			tx.Rollback()
 			return err
@@ -481,9 +526,254 @@ func (s *LibraryService) RefreshVersion(libraryID uint, version string) error {
 		return err
 	}
 
-	// 异步处理文档（在后台队列中重新处理）
-	// TODO: 将文档加入处理队列，由后台 worker 处理
-	// 这里可以使用消息队列（如 Redis、RabbitMQ）或简单的 goroutine
+	// 异步重新处理所有文档（复用 ProcessDocumentAsync）
+	processor := &DocumentProcessor{}
+	for _, doc := range documents {
+		docCopy := doc // 避免闭包问题
+		go func() {
+			// 从存储下载文件内容
+			reader, err := global.Storage.Download(context.Background(), docCopy.FilePath)
+			if err != nil {
+				log.Printf("[RefreshVersion] Failed to download file %s: %v", docCopy.FilePath, err)
+				global.DB.Model(&docCopy).Update("status", "failed")
+				return
+			}
+			content, err := io.ReadAll(reader)
+			reader.Close()
+			if err != nil {
+				log.Printf("[RefreshVersion] Failed to read file content %s: %v", docCopy.FilePath, err)
+				global.DB.Model(&docCopy).Update("status", "failed")
+				return
+			}
+
+			log.Printf("[RefreshVersion] Starting to reprocess document: %s (ID: %d)", docCopy.Title, docCopy.ID)
+			if err := processor.ProcessDocument(&docCopy, content); err != nil {
+				log.Printf("[RefreshVersion] Failed to process document %d: %v", docCopy.ID, err)
+				global.DB.Model(&docCopy).Update("status", "failed")
+			}
+			// 注意：ProcessDocument 内部会更新状态为 completed
+		}()
+	}
+
+	log.Printf("[RefreshVersion] Started reprocessing %d documents for library %d version %s", len(documents), libraryID, version)
 
 	return nil
+}
+
+// RefreshVersionWithCallback 刷新版本（带 SSE 状态回调，无感知更新）
+// 使用批次版本号实现原子切换，确保刷新过程中检索不受影响
+func (s *LibraryService) RefreshVersionWithCallback(libraryID uint, version string, statusChan chan response.RefreshStatus) {
+	defer close(statusChan)
+
+	// 检查库是否存在
+	var library dbmodel.Library
+	if err := global.DB.First(&library, libraryID).Error; err != nil {
+		statusChan <- response.RefreshStatus{Stage: "error", Message: "库不存在"}
+		return
+	}
+
+	// 获取该版本的所有文档
+	var documents []dbmodel.DocumentUpload
+	if err := global.DB.Where("library_id = ? AND version = ?", libraryID, version).
+		Find(&documents).Error; err != nil {
+		statusChan <- response.RefreshStatus{Stage: "error", Message: "获取文档列表失败"}
+		return
+	}
+
+	if len(documents) == 0 {
+		statusChan <- response.RefreshStatus{Stage: "error", Message: "该版本没有文档"}
+		return
+	}
+
+	total := len(documents)
+	statusChan <- response.RefreshStatus{
+		Stage:   "started",
+		Current: 0,
+		Total:   total,
+		Message: fmt.Sprintf("开始刷新 %d 个文档（无感知模式）", total),
+	}
+
+	// 生成新的批次版本号
+	batchVersion := time.Now().UnixNano()
+	log.Printf("[RefreshVersion] Starting refresh with batchVersion=%d for library %d version %s", batchVersion, libraryID, version)
+
+	// 收集所有新 chunks 和文档统计
+	processor := &DocumentProcessor{}
+	type docResult struct {
+		doc         *dbmodel.DocumentUpload
+		chunks      []*dbmodel.DocumentChunk
+		totalTokens int
+		err         error
+	}
+	results := make([]docResult, 0, total)
+	successCount := 0
+
+	// 阶段1：处理所有文档，生成新 chunks（status=pending）
+	for i, doc := range documents {
+		docCopy := doc // 避免闭包问题
+		statusChan <- response.RefreshStatus{
+			DocID:    doc.ID,
+			DocTitle: doc.Title,
+			Stage:    "doc_processing",
+			Current:  i + 1,
+			Total:    total,
+			Message:  fmt.Sprintf("正在处理: %s", doc.Title),
+		}
+
+		// 从存储读取文件内容
+		reader, err := global.Storage.Download(context.Background(), doc.FilePath)
+		if err != nil {
+			log.Printf("[RefreshVersion] Failed to download file %s: %v", doc.FilePath, err)
+			results = append(results, docResult{doc: &docCopy, err: err})
+			statusChan <- response.RefreshStatus{
+				DocID:    doc.ID,
+				DocTitle: doc.Title,
+				Stage:    "doc_failed",
+				Current:  i + 1,
+				Total:    total,
+				Message:  fmt.Sprintf("下载文件失败: %s", doc.Title),
+			}
+			continue
+		}
+		content, err := io.ReadAll(reader)
+		reader.Close()
+		if err != nil {
+			log.Printf("[RefreshVersion] Failed to read file content %s: %v", doc.FilePath, err)
+			results = append(results, docResult{doc: &docCopy, err: err})
+			statusChan <- response.RefreshStatus{
+				DocID:    doc.ID,
+				DocTitle: doc.Title,
+				Stage:    "doc_failed",
+				Current:  i + 1,
+				Total:    total,
+				Message:  fmt.Sprintf("读取文件内容失败: %s", doc.Title),
+			}
+			continue
+		}
+
+		// 处理文档，生成 chunks（不写入数据库）
+		chunks, totalTokens, err := processor.ProcessDocumentForRefresh(&docCopy, content, batchVersion)
+		if err != nil {
+			log.Printf("[RefreshVersion] Failed to process document %d: %v", doc.ID, err)
+			results = append(results, docResult{doc: &docCopy, err: err})
+			statusChan <- response.RefreshStatus{
+				DocID:    doc.ID,
+				DocTitle: doc.Title,
+				Stage:    "doc_failed",
+				Current:  i + 1,
+				Total:    total,
+				Message:  fmt.Sprintf("处理失败: %s", doc.Title),
+			}
+			continue
+		}
+
+		results = append(results, docResult{doc: &docCopy, chunks: chunks, totalTokens: totalTokens})
+		successCount++
+		statusChan <- response.RefreshStatus{
+			DocID:    doc.ID,
+			DocTitle: doc.Title,
+			Stage:    "doc_completed",
+			Current:  i + 1,
+			Total:    total,
+			Message:  fmt.Sprintf("处理完成: %s（%d chunks）", doc.Title, len(chunks)),
+		}
+	}
+
+	// 如果没有成功处理任何文档，直接返回
+	if successCount == 0 {
+		statusChan <- response.RefreshStatus{Stage: "error", Message: "所有文档处理失败"}
+		return
+	}
+
+	// 阶段2：原子切换（事务）
+	statusChan <- response.RefreshStatus{
+		Stage:   "switching",
+		Current: total,
+		Total:   total,
+		Message: "正在原子切换数据...",
+	}
+
+	tx := global.DB.Begin()
+	for _, result := range results {
+		if result.err != nil {
+			// 标记失败的文档
+			tx.Model(result.doc).Update("status", "failed")
+			continue
+		}
+
+		// 插入新 chunks（status=pending）
+		if len(result.chunks) > 0 {
+			if err := tx.CreateInBatches(result.chunks, 100).Error; err != nil {
+				tx.Rollback()
+				log.Printf("[RefreshVersion] Failed to insert new chunks: %v", err)
+				statusChan <- response.RefreshStatus{Stage: "error", Message: "插入新数据失败"}
+				return
+			}
+		}
+
+		// 原子切换：旧 chunks -> deleted，新 chunks -> active
+		// 1. 将旧的 active chunks 标记为 deleted
+		if err := tx.Model(&dbmodel.DocumentChunk{}).
+			Where("upload_id = ? AND status = ? AND batch_version < ?", result.doc.ID, "active", batchVersion).
+			Update("status", "deleted").Error; err != nil {
+			tx.Rollback()
+			log.Printf("[RefreshVersion] Failed to mark old chunks as deleted: %v", err)
+			statusChan <- response.RefreshStatus{Stage: "error", Message: "标记旧数据失败"}
+			return
+		}
+
+		// 2. 将新的 pending chunks 激活
+		if err := tx.Model(&dbmodel.DocumentChunk{}).
+			Where("upload_id = ? AND batch_version = ? AND status = ?", result.doc.ID, batchVersion, "pending").
+			Update("status", "active").Error; err != nil {
+			tx.Rollback()
+			log.Printf("[RefreshVersion] Failed to activate new chunks: %v", err)
+			statusChan <- response.RefreshStatus{Stage: "error", Message: "激活新数据失败"}
+			return
+		}
+
+		// 更新文档状态和统计
+		if err := tx.Model(result.doc).Updates(map[string]interface{}{
+			"status":      "completed",
+			"chunk_count": len(result.chunks),
+			"token_count": result.totalTokens,
+		}).Error; err != nil {
+			tx.Rollback()
+			log.Printf("[RefreshVersion] Failed to update document status: %v", err)
+			statusChan <- response.RefreshStatus{Stage: "error", Message: "更新文档状态失败"}
+			return
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		log.Printf("[RefreshVersion] Failed to commit transaction: %v", err)
+		statusChan <- response.RefreshStatus{Stage: "error", Message: "事务提交失败"}
+		return
+	}
+
+	// 阶段3：对标记为 deleted 的旧数据执行 GORM 软删除（设置 deleted_at）
+	go func() {
+		result := global.DB.Where("library_id = ? AND version = ? AND status = ?", libraryID, version, "deleted").
+			Delete(&dbmodel.DocumentChunk{})
+		if result.Error != nil {
+			log.Printf("[RefreshVersion] WARNING: Failed to soft delete old chunks: %v", result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("[RefreshVersion] Soft deleted %d old chunks for library %d version %s", result.RowsAffected, libraryID, version)
+		}
+	}()
+
+	// 失效缓存
+	searchService := &SearchService{}
+	if err := searchService.InvalidateLibraryCache(libraryID, version); err != nil {
+		log.Printf("[RefreshVersion] WARNING: Failed to invalidate cache: %v", err)
+	}
+
+	statusChan <- response.RefreshStatus{
+		Stage:   "all_completed",
+		Current: total,
+		Total:   total,
+		Message: fmt.Sprintf("全部完成，成功处理 %d/%d 个文档", successCount, total),
+	}
+
+	log.Printf("[RefreshVersion] Completed refresh for library %d version %s: %d/%d documents", libraryID, version, successCount, total)
 }

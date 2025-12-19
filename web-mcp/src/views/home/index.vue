@@ -224,18 +224,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
-
-const ElMessage = {
-  success: (msg: string) => console.log('✓', msg),
-  warning: (msg: string) => alert(msg),
-  error: (msg: string) => alert(msg),
-}
-const ElMessageBox = {
-  confirm: (msg: string, title: string, options: any) => Promise.resolve(confirm(msg) ? 'confirm' : Promise.reject()),
-}
 import { getLibraries, createLibrary, updateLibrary, deleteLibrary } from '@/api/library'
 import type { LibraryListItem } from '@/api/library'
 

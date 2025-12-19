@@ -9,14 +9,21 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisCache implements Cache using Redis
+// =============================================================================
+// RedisCache
+// =============================================================================
+
+// RedisCache Redis 缓存实现，同时实现 Cache 和 TagAwareCache 接口
 type RedisCache struct {
 	client *redis.Client
 	prefix string
 	ctx    context.Context
 }
 
-// NewRedisCache creates a new Redis cache
+// 编译时检查接口实现
+var _ TagAwareCache = (*RedisCache)(nil)
+
+// NewRedisCache 创建 Redis 缓存（新建连接）
 func NewRedisCache(host string, port int, password string, db int, prefix string) (*RedisCache, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", host, port),
@@ -25,87 +32,105 @@ func NewRedisCache(host string, port int, password string, db int, prefix string
 	})
 
 	ctx := context.Background()
-
-	// Test connection
 	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	return &RedisCache{
-		client: client,
-		prefix: prefix,
-		ctx:    ctx,
-	}, nil
+	return &RedisCache{client: client, prefix: prefix, ctx: ctx}, nil
 }
 
-// Get retrieves a value from cache
+// NewRedisCacheWithClient 创建 Redis 缓存（复用已有连接）
+func NewRedisCacheWithClient(client *redis.Client, prefix string) *RedisCache {
+	return &RedisCache{client: client, prefix: prefix, ctx: context.Background()}
+}
+
+// -----------------------------------------------------------------------------
+// Cache 接口实现
+// -----------------------------------------------------------------------------
+
+// Get 从缓存获取值，反序列化到 dest
 func (c *RedisCache) Get(key string, dest interface{}) error {
-	fullKey := c.prefix + key
-	data, err := c.client.Get(c.ctx, fullKey).Bytes()
+	data, err := c.client.Get(c.ctx, c.prefix+key).Bytes()
 	if err == redis.Nil {
 		return ErrCacheMiss
 	}
 	if err != nil {
 		return err
 	}
-
 	return json.Unmarshal(data, dest)
 }
 
-// Set stores a value in cache with TTL
+// Set 设置缓存值（带 TTL）
 func (c *RedisCache) Set(key string, value interface{}, ttl time.Duration) error {
-	fullKey := c.prefix + key
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-
-	return c.client.Set(c.ctx, fullKey, data, ttl).Err()
+	return c.client.Set(c.ctx, c.prefix+key, data, ttl).Err()
 }
 
-// Delete removes a key from cache
+// Delete 删除指定 key
 func (c *RedisCache) Delete(key string) error {
-	fullKey := c.prefix + key
-	return c.client.Del(c.ctx, fullKey).Err()
+	return c.client.Del(c.ctx, c.prefix+key).Err()
 }
 
-// Exists checks if a key exists in cache
+// Exists 检查 key 是否存在
 func (c *RedisCache) Exists(key string) (bool, error) {
-	fullKey := c.prefix + key
-	n, err := c.client.Exists(c.ctx, fullKey).Result()
-	if err != nil {
-		return false, err
-	}
-	return n > 0, nil
+	n, err := c.client.Exists(c.ctx, c.prefix+key).Result()
+	return n > 0, err
 }
 
-// Clear removes all keys with the given prefix
+// Clear 清除指定前缀的所有缓存（使用 SCAN 避免阻塞）
 func (c *RedisCache) Clear(prefix string) error {
-	fullPrefix := c.prefix + prefix + "*"
-	iter := c.client.Scan(c.ctx, 0, fullPrefix, 0).Iterator()
-
+	iter := c.client.Scan(c.ctx, 0, c.prefix+prefix+"*", 100).Iterator()
 	for iter.Next(c.ctx) {
 		if err := c.client.Del(c.ctx, iter.Val()).Err(); err != nil {
 			return err
 		}
 	}
-
 	return iter.Err()
 }
 
-// Close closes the Redis connection
+// Close 关闭 Redis 连接
 func (c *RedisCache) Close() error {
 	return c.client.Close()
 }
 
-// AddToBlacklist adds a token to the blacklist (for JWT revocation)
-func (c *RedisCache) AddToBlacklist(tokenID string, ttl time.Duration) error {
-	key := "blacklist:" + tokenID
-	return c.Set(key, true, ttl)
+// -----------------------------------------------------------------------------
+// TagAwareCache 接口实现
+// -----------------------------------------------------------------------------
+
+const tagVersionKeyPrefix = "tag:version:"
+
+// GetTagVersion 获取 tag 版本号（不存在返回 0）
+func (c *RedisCache) GetTagVersion(tag string) (int64, error) {
+	version, err := c.client.Get(c.ctx, c.prefix+tagVersionKeyPrefix+tag).Int64()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	return version, err
 }
 
-// IsBlacklisted checks if a token is blacklisted
+// InvalidateTags 递增 tag 版本号，使关联缓存失效
+func (c *RedisCache) InvalidateTags(tags []string) error {
+	for _, tag := range tags {
+		if err := c.client.Incr(c.ctx, c.prefix+tagVersionKeyPrefix+tag).Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+// 业务扩展方法
+// -----------------------------------------------------------------------------
+
+// AddToBlacklist 添加 token 到黑名单（用于 JWT 撤销）
+func (c *RedisCache) AddToBlacklist(tokenID string, ttl time.Duration) error {
+	return c.Set("blacklist:"+tokenID, true, ttl)
+}
+
+// IsBlacklisted 检查 token 是否在黑名单
 func (c *RedisCache) IsBlacklisted(tokenID string) (bool, error) {
-	key := "blacklist:" + tokenID
-	return c.Exists(key)
+	return c.Exists("blacklist:" + tokenID)
 }

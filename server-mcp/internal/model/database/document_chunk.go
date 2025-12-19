@@ -31,7 +31,10 @@ type DocumentChunk struct {
 	ChunkType   string `json:"chunk_type" gorm:"size:10;default:'mixed'"` // code, info, mixed
 	AccessCount int    `json:"access_count" gorm:"default:0"`             // 访问次数（用于热度计算）
 	Metadata    JSON   `json:"metadata" gorm:"type:jsonb"`                // 扩展元数据
-	Status      string `json:"status" gorm:"size:20;default:'active'"`    // active, deleted
+	Status      string `json:"status" gorm:"size:20;default:'active'"`    // active, pending, deleted
+
+	// 版本控制（用于无感知更新）
+	BatchVersion int64 `json:"batch_version" gorm:"default:0;index"` // 批次版本号，支持原子切换
 
 	// 关联
 	Library Library `json:"-" gorm:"foreignKey:LibraryID"`

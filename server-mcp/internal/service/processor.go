@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"regexp"
@@ -9,29 +10,48 @@ import (
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/response"
 	"go-mcp-context/pkg/global"
+	"go-mcp-context/pkg/llm"
 
 	"github.com/pgvector/pgvector-go"
 	"github.com/pkoukk/tiktoken-go"
 )
 
+// 分块配置常量
+const (
+	DefaultChunkSize   = 512 // 默认块大小（tokens）
+	MinChunkSize       = 50  // 最小块大小（tokens），低于此值合并
+	MaxEnrichBatchSize = 10  // LLM Enrich 批处理大小
+)
+
 // DocumentProcessor 文档处理器
 type DocumentProcessor struct{}
 
-// ProcessDocument 处理文档（解析、分块、生成 Embedding）
-func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content []byte) error {
+// processDocumentCore 文档处理核心逻辑（解析、分块、Enrich、生成 Embedding）
+// 返回处理好的 chunks 和总 token 数，不写入数据库
+func (p *DocumentProcessor) processDocumentCore(doc *dbmodel.DocumentUpload, content []byte) ([]*dbmodel.DocumentChunk, int, error) {
 	// 1. 解析文档内容
 	text, err := p.parseDocument(doc.FileType, content)
 	if err != nil {
-		return fmt.Errorf("failed to parse document: %w", err)
+		return nil, 0, fmt.Errorf("failed to parse document: %w", err)
 	}
 
-	// 2. 分块
+	// 2. Pre-Chunking: 清理文档（移除徽章、空白等）
+	text = p.preProcessMarkdown(text)
+
+	// 3. 分块
 	chunks := p.chunkText(text, doc.ID, doc.LibraryID, doc.Version, doc.FilePath)
 	if len(chunks) == 0 {
-		return nil
+		return nil, 0, nil
 	}
 
-	// 3. 批量生成 Embedding
+	// 4. LLM Enrich: 生成 Title 和 Description
+	if global.LLM != nil {
+		if err := p.enrichChunks(chunks); err != nil {
+			log.Printf("[Processor] WARNING: LLM enrich failed: %v, using fallback", err)
+		}
+	}
+
+	// 5. 批量生成 Embedding
 	texts := make([]string, len(chunks))
 	for i, chunk := range chunks {
 		texts[i] = chunk.ChunkText
@@ -39,14 +59,30 @@ func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content
 
 	embeddings, err := global.Embedding.EmbedBatch(texts)
 	if err != nil {
-		return fmt.Errorf("failed to generate embeddings: %w", err)
+		return nil, 0, fmt.Errorf("failed to generate embeddings: %w", err)
 	}
 
-	// 4. 设置 Embedding 并存储
+	// 6. 设置 Embedding
+	totalTokens := 0
 	for i := range chunks {
 		if i < len(embeddings) {
 			chunks[i].Embedding = pgvector.NewVector(embeddings[i])
 		}
+		totalTokens += chunks[i].Tokens
+	}
+
+	return chunks, totalTokens, nil
+}
+
+// ProcessDocument 处理文档（用于新文档上传）
+func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content []byte) error {
+	// 调用核心处理逻辑
+	chunks, totalTokens, err := p.processDocumentCore(doc, content)
+	if err != nil {
+		return err
+	}
+	if len(chunks) == 0 {
+		return nil
 	}
 
 	// 批量插入
@@ -54,13 +90,7 @@ func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content
 		return fmt.Errorf("failed to save chunks: %w", err)
 	}
 
-	// 5. 计算总 token 数
-	totalTokens := 0
-	for _, chunk := range chunks {
-		totalTokens += chunk.Tokens
-	}
-
-	// 6. 更新文档状态和统计信息
+	// 更新文档状态和统计信息
 	doc.Status = "completed"
 	doc.ChunkCount = len(chunks)
 	doc.TokenCount = totalTokens
@@ -68,7 +98,35 @@ func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content
 		return fmt.Errorf("failed to update document status: %w", err)
 	}
 
+	// 失效该库版本的搜索缓存（Version Tag 模式）
+	searchService := &SearchService{}
+	if err := searchService.InvalidateLibraryCache(doc.LibraryID, doc.Version); err != nil {
+		log.Printf("[Processor] WARNING: Failed to invalidate cache for library %d version %s: %v", doc.LibraryID, doc.Version, err)
+	}
+
 	return nil
+}
+
+// ProcessDocumentForRefresh 处理文档用于刷新（无感知更新）
+// 返回生成的 chunks，不直接写入数据库，由调用方控制事务
+// batchVersion: 批次版本号，用于原子切换
+func (p *DocumentProcessor) ProcessDocumentForRefresh(doc *dbmodel.DocumentUpload, content []byte, batchVersion int64) ([]*dbmodel.DocumentChunk, int, error) {
+	// 调用核心处理逻辑
+	chunks, totalTokens, err := p.processDocumentCore(doc, content)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(chunks) == 0 {
+		return nil, 0, nil
+	}
+
+	// 设置 BatchVersion 和 pending 状态
+	for i := range chunks {
+		chunks[i].BatchVersion = batchVersion
+		chunks[i].Status = "pending" // 待激活状态
+	}
+
+	return chunks, totalTokens, nil
 }
 
 // parseDocument 解析文档内容
@@ -188,8 +246,14 @@ func (p *DocumentProcessor) splitMarkdownWithMetadata(text string) []MarkdownSec
 			delete(currentHeaders, fmt.Sprintf("h%d", l))
 		}
 
-		// 获取内容范围
-		contentStart := match[0]
+		// 获取内容范围（从标题行之后开始，不包含标题行本身）
+		// match[1] 是标题行的结尾位置
+		contentStart := match[1]
+		// 跳过标题行后的换行符
+		for contentStart < len(text) && (text[contentStart] == '\n' || text[contentStart] == '\r') {
+			contentStart++
+		}
+
 		var contentEnd int
 		if i+1 < len(matches) {
 			contentEnd = matches[i+1][0]
@@ -197,7 +261,14 @@ func (p *DocumentProcessor) splitMarkdownWithMetadata(text string) []MarkdownSec
 			contentEnd = len(text)
 		}
 
-		content := strings.TrimSpace(text[contentStart:contentEnd])
+		// 提取内容（不含标题行）
+		content := ""
+		if contentStart < contentEnd {
+			content = strings.TrimSpace(text[contentStart:contentEnd])
+		}
+
+		// 只有当内容不为空时才创建 section
+		// 空标题（只有标题没有内容）的 headers 会传递给下一个有内容的 section
 		if content != "" {
 			sections = append(sections, MarkdownSection{
 				Content: content,
@@ -240,35 +311,43 @@ func copyHeaders(headers map[string]string) map[string]string {
 }
 
 // createChunkWithMetadata 创建带元数据的文档块
+// Code Mode: 设置 Language、Code，Metadata 在 enrichChunks 中清空
+// Info Mode: Language、Code、Description 为空，Metadata 存 headers 层级
 func (p *DocumentProcessor) createChunkWithMetadata(text string, index int, uploadID, libraryID uint, version, source string, tokens int, headers map[string]string) *dbmodel.DocumentChunk {
 	chunkType := p.detectChunkType(text)
-	codeBlock := p.extractCodeBlock(text)
-	language := p.detectLanguage(text)
-
-	// 构建元数据
-	metadata := make(dbmodel.JSON)
-	for k, v := range headers {
-		metadata[k] = v
-	}
 
 	// 生成标题（使用标题层级构建）
 	title := p.buildTitleFromHeaders(headers)
 
-	return &dbmodel.DocumentChunk{
+	chunk := &dbmodel.DocumentChunk{
 		LibraryID:  libraryID,
 		UploadID:   uploadID,
 		Version:    version,
 		ChunkIndex: index,
 		Title:      title,
 		Source:     source,
-		Language:   language,
-		Code:       codeBlock,
 		ChunkText:  text,
 		Tokens:     tokens,
 		ChunkType:  chunkType,
-		Metadata:   metadata,
 		Status:     "active",
 	}
+
+	if chunkType == "code" {
+		// Code Mode: 设置 Language 和 Code，Metadata 为空
+		chunk.Language = p.detectLanguage(text)
+		chunk.Code = p.extractCodeBlock(text)
+		// Metadata 不需要存储，LLM 用 Title（headers 层级格式）作为上下文
+	} else {
+		// Info Mode: Language、Code、Description 为空
+		// Metadata 存 headers 层级（用于调试和追溯）
+		metadata := make(dbmodel.JSON)
+		for k, v := range headers {
+			metadata[k] = v
+		}
+		chunk.Metadata = metadata
+	}
+
+	return chunk
 }
 
 // splitLargeSectionWithMetadata 分割超大 section（保持代码块完整）
@@ -415,24 +494,12 @@ func (p *DocumentProcessor) splitIntoAtoms(text string) []string {
 	return atoms
 }
 
-// detectChunkType 检测块类型
+// detectChunkType 检测块类型（只有 code 和 info 两种）
 func (p *DocumentProcessor) detectChunkType(text string) string {
-	// 检测是否包含代码块
-	hasCode := strings.Contains(text, "```") ||
-		strings.Contains(text, "    ") || // 缩进代码
-		strings.Contains(text, "func ") ||
-		strings.Contains(text, "function ") ||
-		strings.Contains(text, "class ") ||
-		strings.Contains(text, "def ")
+	// 检测是否包含代码块（``` 包裹的代码）
+	hasCodeBlock := strings.Contains(text, "```")
 
-	// 检测是否主要是说明文字
-	hasInfo := strings.Contains(text, "# ") ||
-		strings.Contains(text, "## ") ||
-		len(text) > 200 && !hasCode
-
-	if hasCode && hasInfo {
-		return "mixed"
-	} else if hasCode {
+	if hasCodeBlock {
 		return "code"
 	}
 	return "info"
@@ -473,7 +540,7 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 	log.Printf("[Processor] Starting to process document: %s (ID: %d)", doc.Title, doc.ID)
 
 	// 1. 解析文档
-	statusChan <- response.ProcessStatus{Stage: "parsing", Progress: 10, Message: "正在解析文档...", Status: "processing"}
+	statusChan <- response.ProcessStatus{Stage: "parsing", Progress: 5, Message: "正在解析文档...", Status: "processing"}
 	text, err := p.parseDocument(doc.FileType, content)
 	if err != nil {
 		statusChan <- response.ProcessStatus{Stage: "failed", Progress: 0, Message: "解析失败: " + err.Error(), Status: "failed"}
@@ -483,8 +550,12 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 		return
 	}
 
-	// 2. 分块
-	statusChan <- response.ProcessStatus{Stage: "chunking", Progress: 30, Message: "正在分块...", Status: "processing"}
+	// 2. Pre-Chunking: 清理文档
+	statusChan <- response.ProcessStatus{Stage: "preprocessing", Progress: 10, Message: "正在预处理文档...", Status: "processing"}
+	text = p.preProcessMarkdown(text)
+
+	// 3. 分块
+	statusChan <- response.ProcessStatus{Stage: "chunking", Progress: 20, Message: "正在分块...", Status: "processing"}
 	chunks := p.chunkText(text, doc.ID, doc.LibraryID, doc.Version, doc.FilePath)
 	if len(chunks) == 0 {
 		statusChan <- response.ProcessStatus{Stage: "failed", Progress: 0, Message: "分块失败：无有效内容", Status: "failed"}
@@ -494,8 +565,16 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 		return
 	}
 
-	// 3. 生成 Embedding
-	statusChan <- response.ProcessStatus{Stage: "embedding", Progress: 50, Message: fmt.Sprintf("正在生成 Embedding（%d 块）...", len(chunks)), Status: "processing"}
+	// 4. LLM Enrich: 生成 Title 和 Description
+	if global.LLM != nil {
+		statusChan <- response.ProcessStatus{Stage: "enriching", Progress: 35, Message: fmt.Sprintf("正在 AI 增强（%d 块）...", len(chunks)), Status: "processing"}
+		if err := p.enrichChunks(chunks); err != nil {
+			log.Printf("[Processor] WARNING: LLM enrich failed: %v, using fallback", err)
+		}
+	}
+
+	// 5. 生成 Embedding
+	statusChan <- response.ProcessStatus{Stage: "embedding", Progress: 60, Message: fmt.Sprintf("正在生成 Embedding（%d 块）...", len(chunks)), Status: "processing"}
 	var texts []string
 	for _, chunk := range chunks {
 		texts = append(texts, chunk.ChunkText)
@@ -510,8 +589,8 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 		return
 	}
 
-	// 4. 保存
-	statusChan <- response.ProcessStatus{Stage: "saving", Progress: 80, Message: "正在保存...", Status: "processing"}
+	// 6. 保存
+	statusChan <- response.ProcessStatus{Stage: "saving", Progress: 85, Message: "正在保存...", Status: "processing"}
 	for i, chunk := range chunks {
 		if i < len(embeddings) {
 			chunk.Embedding = pgvector.NewVector(embeddings[i])
@@ -526,13 +605,13 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 		return
 	}
 
-	// 5. 计算统计信息
+	// 7. 计算统计信息
 	totalTokens := 0
 	for _, chunk := range chunks {
 		totalTokens += chunk.Tokens
 	}
 
-	// 6. 完成 - 更新文档状态和统计
+	// 8. 完成 - 更新文档状态和统计
 	doc.Status = "completed"
 	doc.ChunkCount = len(chunks)
 	doc.TokenCount = totalTokens
@@ -540,6 +619,93 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 		log.Printf("[Processor] Failed to save document stats: %v", err)
 	}
 
+	// 9. 失效该库版本的搜索缓存（Version Tag 模式）
+	searchService := &SearchService{}
+	if err := searchService.InvalidateLibraryCache(doc.LibraryID, doc.Version); err != nil {
+		log.Printf("[Processor] WARNING: Failed to invalidate cache for library %d version %s: %v", doc.LibraryID, doc.Version, err)
+	}
+
 	log.Printf("[Processor] Successfully processed document: %s (chunks: %d, tokens: %d)", doc.Title, len(chunks), totalTokens)
 	statusChan <- response.ProcessStatus{Stage: "completed", Progress: 100, Message: "处理完成", Status: "completed"}
+}
+
+// ============================================================================
+// Pre-Chunking: 文档预处理
+// ============================================================================
+
+// preProcessMarkdown 预处理 Markdown 文档
+// 移除徽章、空白行、HTML 标签等无效内容
+func (p *DocumentProcessor) preProcessMarkdown(text string) string {
+	// 1. 移除 Markdown 徽章 [![...](...)
+	badgeRegex := regexp.MustCompile(`\[!\[.*?\]\(.*?\)\]\(.*?\)`)
+	text = badgeRegex.ReplaceAllString(text, "")
+
+	// 2. 移除单独的图片标签 ![...](...)
+	// 但保留带说明的图片
+	standaloneImgRegex := regexp.MustCompile(`(?m)^!\[.*?\]\(.*?\)\s*$`)
+	text = standaloneImgRegex.ReplaceAllString(text, "")
+
+	// 3. 移除 HTML 注释
+	htmlCommentRegex := regexp.MustCompile(`<!--[\s\S]*?-->`)
+	text = htmlCommentRegex.ReplaceAllString(text, "")
+
+	// 4. 移除 HTML img 标签
+	htmlImgRegex := regexp.MustCompile(`<img[^>]*>`)
+	text = htmlImgRegex.ReplaceAllString(text, "")
+
+	// 5. 移除连续的空行（保留最多一个）
+	multipleNewlines := regexp.MustCompile(`\n{3,}`)
+	text = multipleNewlines.ReplaceAllString(text, "\n\n")
+
+	// 6. 移除 --- 分隔线
+	hrRegex := regexp.MustCompile(`(?m)^---+\s*$`)
+	text = hrRegex.ReplaceAllString(text, "")
+
+	return strings.TrimSpace(text)
+}
+
+// ============================================================================
+// LLM Enrich: 为文档块生成 Title 和 Description
+// ============================================================================
+
+// enrichChunks 使用 LLM 为 code 类型的文档块生成 Title 和 Description
+// Info 类型的块保持 Title 为 headers 层级，不调用 LLM
+func (p *DocumentProcessor) enrichChunks(chunks []*dbmodel.DocumentChunk) error {
+	ctx := context.Background()
+
+	for i, chunk := range chunks {
+		// Info Mode: 保持 Title 为 headers 层级，不调用 LLM
+		// Title 已经在 createChunkWithMetadata 中通过 buildTitleFromHeaders 设置
+		if chunk.ChunkType == "info" {
+			// Info 类型：清空 Metadata（不需要存储）
+			// 注意：Title 已经是 headers 层级格式，保持不变
+			log.Printf("[Processor] Info chunk %d: keeping headers as title: %s", i, chunk.Title)
+			continue
+		}
+
+		// Code Mode: 调用 LLM 生成 Title 和 Description
+		input := llm.EnrichInput{
+			Content: chunk.ChunkText,
+			Headers: chunk.Title, // 当前 Title 是从 headers 构建的层级标题，作为上下文
+		}
+
+		output, err := global.LLM.Enrich(ctx, input)
+		if err != nil {
+			log.Printf("[Processor] Enrich failed for chunk %d: %v", i, err)
+			// 失败时使用 fallback：保持原有 Title，Description 为空
+			continue
+		}
+
+		// 更新 chunk
+		if output.Title != "" {
+			chunk.Title = output.Title
+		}
+		if output.Description != "" {
+			chunk.Description = output.Description
+		}
+
+		log.Printf("[Processor] Enriched code chunk %d: %s", i, output.Title)
+	}
+
+	return nil
 }

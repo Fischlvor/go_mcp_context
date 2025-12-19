@@ -50,7 +50,8 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   (response: AxiosResponse) => {
     // 检查是否有新的 token（自动刷新）
-    const newToken = response.headers['X-New-Access-Token']
+    // 注意：Axios 会将响应头转为小写
+    const newToken = response.headers['x-new-access-token']
     if (newToken) {
       console.log('✓ Token 已自动刷新')
       setAccessToken(newToken)

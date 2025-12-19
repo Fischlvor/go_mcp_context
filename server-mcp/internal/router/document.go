@@ -13,9 +13,9 @@ func (d *DocumentRouter) InitDocumentPublicRouter(Router *gin.RouterGroup) {
 	documentRouter := Router.Group("documents")
 	documentApi := api.ApiGroupApp.DocumentApi
 	{
-		documentRouter.GET("list", documentApi.List)                              // 查询文档列表
-		documentRouter.GET("detail/:id", documentApi.Get)                         // 查询文档详情
-		documentRouter.GET("chunks/:mode/:libid/*version", documentApi.GetChunks) // 获取库的文档块 (mode: code/info, version 可选)
+		documentRouter.GET("list", documentApi.List)                     // 查询文档列表
+		documentRouter.GET("detail/:id", documentApi.Get)                // 查询文档详情
+		documentRouter.GET("chunks/:mode/:libid", documentApi.GetChunks) // 获取库的文档块 (mode: code/info, version 通过 query 参数传递)
 	}
 }
 

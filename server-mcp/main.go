@@ -32,6 +32,7 @@ func main() {
 
 	global.DB = initialize.InitGorm()
 	global.Redis = initialize.ConnectRedis()
+	global.Cache = initialize.InitCache() // 初始化通用缓存服务
 	global.Embedding = initialize.InitEmbedding()
 	initialize.InitStorage() // 初始化存储服务
 	initialize.InitLLM()     // 初始化 LLM 服务

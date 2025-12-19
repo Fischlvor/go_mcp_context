@@ -303,6 +303,63 @@
       </div>
     </div>
 
+    <!-- Refresh Progress Modal -->
+    <div v-if="refreshing" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
+        <div class="mb-4">
+          <h2 class="text-lg font-semibold text-stone-800">Refreshing Version: {{ refreshingVersion }}</h2>
+          <p class="mt-1 text-sm text-stone-500">Reprocessing all documents in this version...</p>
+        </div>
+
+        <!-- Progress Bar -->
+        <div v-if="refreshProgress" class="mb-4">
+          <div class="flex justify-between text-sm text-stone-600 mb-1">
+            <span>{{ refreshProgress.message }}</span>
+            <span>{{ refreshProgress.current }} / {{ refreshProgress.total }}</span>
+          </div>
+          <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+            <div 
+              class="h-full bg-emerald-500 transition-all duration-300"
+              :style="{ width: `${refreshProgress.total > 0 ? (refreshProgress.current / refreshProgress.total) * 100 : 0}%` }"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Document Status List -->
+        <div v-if="refreshDocStatuses.length > 0" class="max-h-48 overflow-y-auto border border-stone-200 rounded-lg">
+          <div 
+            v-for="doc in refreshDocStatuses" 
+            :key="doc.id"
+            class="flex items-center gap-2 px-3 py-2 border-b border-stone-100 last:border-b-0"
+          >
+            <!-- Status Icon -->
+            <div class="flex-shrink-0">
+              <svg v-if="doc.status === 'processing'" class="h-4 w-4 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <svg v-else-if="doc.status === 'completed'" class="h-4 w-4 text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
+              </svg>
+              <svg v-else class="h-4 w-4 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm-1.72 6.97a.75.75 0 10-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 101.06 1.06L12 13.06l1.72 1.72a.75.75 0 101.06-1.06L13.06 12l1.72-1.72a.75.75 0 10-1.06-1.06L12 10.94l-1.72-1.72z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <!-- Document Title -->
+            <span class="text-sm text-stone-700 truncate">{{ doc.title }}</span>
+          </div>
+        </div>
+
+        <!-- Loading State (before documents start) -->
+        <div v-else class="flex items-center justify-center py-8">
+          <svg class="h-8 w-8 text-emerald-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <AppFooter />
   </div>
@@ -311,10 +368,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useUser } from '@/stores/user'
-import { getLibrary, updateLibrary, createVersion, deleteVersion, refreshVersion, deleteLibrary, getVersions } from '@/api/library'
+import { getLibrary, updateLibrary, createVersion, deleteVersion, refreshVersionWithSSE, deleteLibrary, getVersions } from '@/api/library'
+import type { RefreshStatus } from '@/api/library'
 import { useRouter } from 'vue-router'
 import { getDocuments, deleteDocument, uploadDocumentWithSSE } from '@/api/document'
 import type { Library } from '@/api/library'
@@ -348,6 +407,12 @@ const saving = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
 const uploadMessage = ref('')
+
+// 刷新版本状态
+const refreshing = ref(false)
+const refreshingVersion = ref('')
+const refreshProgress = ref<RefreshStatus | null>(null)
+const refreshDocStatuses = ref<Array<{ id: number; title: string; status: 'processing' | 'completed' | 'failed' }>>([])
 
 // Configuration form
 const editForm = reactive({
@@ -438,14 +503,14 @@ const handleFileUpload = async (event: Event) => {
   if (!file) return
 
   if (!selectedVersion.value) {
-    alert('Please select a version first')
+    ElMessage.warning('Please select a version first')
     return
   }
 
   const allowedTypes = ['.md', '.pdf', '.docx']
   const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
   if (!allowedTypes.includes(ext)) {
-    alert('Only .md, .pdf, .docx formats are supported')
+    ElMessage.warning('Only .md, .pdf, .docx formats are supported')
     return
   }
 
@@ -500,7 +565,7 @@ const handleFileUpload = async (event: Event) => {
 
     eventSource.addEventListener('error', (event) => {
       console.error('Upload error:', event)
-      alert('Upload failed')
+      ElMessage.error('Upload failed')
       eventSource.close()
       uploading.value = false
       uploadProgress.value = 0
@@ -513,7 +578,7 @@ const handleFileUpload = async (event: Event) => {
       body: formData
     })
   } catch (error) {
-    alert('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    ElMessage.error('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
     uploading.value = false
   }
   
@@ -541,7 +606,7 @@ const handleDeleteLibrary = async () => {
   try {
     await deleteLibrary(libraryId.value)
     console.log('✓ Library deleted')
-    alert('Library deleted successfully')
+    ElMessage.success('Library deleted successfully')
     router.push('/')
   } catch (error) {
     console.error('Failed to delete library:', error)
@@ -578,19 +643,54 @@ const formatNumber = (num: number) => {
 const handleReprocess = async (id: number) => {
   // TODO: 实现重新处理文档的 API
   console.log('Reprocess document:', id)
-  alert('Reprocess feature coming soon')
+  ElMessage.info('Reprocess feature coming soon')
 }
 
 const handleRefreshVersion = async (version: string) => {
   if (!confirm(`Refresh version "${version}"? This will reprocess all documents in this version.`)) return
   
+  // 初始化刷新状态
+  refreshing.value = true
+  refreshingVersion.value = version
+  refreshProgress.value = null
+  refreshDocStatuses.value = []
+  
   try {
-    await refreshVersion(libraryId.value, version)
-    console.log('✓ Version refresh started')
-    alert('Version refresh started. Documents will be reprocessed in the background.')
-    await fetchVersions()
+    await refreshVersionWithSSE(libraryId.value, version, {
+      onProgress: (status) => {
+        refreshProgress.value = status
+        
+        // 更新文档状态列表
+        if (status.doc_id && status.doc_title) {
+          const existing = refreshDocStatuses.value.find(d => d.id === status.doc_id)
+          if (existing) {
+            existing.status = status.stage === 'doc_completed' ? 'completed' 
+                            : status.stage === 'doc_failed' ? 'failed' 
+                            : 'processing'
+          } else {
+            refreshDocStatuses.value.push({
+              id: status.doc_id,
+              title: status.doc_title,
+              status: 'processing'
+            })
+          }
+        }
+      },
+      onComplete: (status) => {
+        refreshProgress.value = status
+        ElMessage.success(`Version refresh completed. ${status.total} documents processed.`)
+        refreshing.value = false
+        fetchVersions()
+      },
+      onError: (error) => {
+        console.error('Failed to refresh version:', error)
+        ElMessage.error('Refresh failed: ' + error.message)
+        refreshing.value = false
+      }
+    })
   } catch (error) {
     console.error('Failed to refresh version:', error)
+    refreshing.value = false
   }
 }
 
@@ -600,7 +700,7 @@ const handleDeleteVersion = async (version: string) => {
   try {
     await deleteVersion(libraryId.value, version)
     console.log('✓ Version deleted')
-    alert('Version deleted successfully')
+    ElMessage.success('Version deleted successfully')
     await fetchVersions()
   } catch (error) {
     console.error('Failed to delete version:', error)
@@ -609,7 +709,7 @@ const handleDeleteVersion = async (version: string) => {
 
 const handleAddVersion = async () => {
   if (!newVersionName.value.trim()) {
-    alert('Please enter a version name')
+    ElMessage.warning('Please enter a version name')
     return
   }
 
