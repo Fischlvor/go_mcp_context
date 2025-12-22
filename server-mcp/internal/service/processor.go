@@ -6,6 +6,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"sync"
 
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/response"
@@ -670,42 +671,69 @@ func (p *DocumentProcessor) preProcessMarkdown(text string) string {
 
 // enrichChunks 使用 LLM 为 code 类型的文档块生成 Title 和 Description
 // Info 类型的块保持 Title 为 headers 层级，不调用 LLM
+// 使用 5 个 worker 并发加速处理
 func (p *DocumentProcessor) enrichChunks(chunks []*dbmodel.DocumentChunk) error {
 	ctx := context.Background()
 
+	// 筛选需要富化的 code chunks
+	type enrichTask struct {
+		idx   int
+		chunk *dbmodel.DocumentChunk
+	}
+
+	var tasks []enrichTask
 	for i, chunk := range chunks {
-		// Info Mode: 保持 Title 为 headers 层级，不调用 LLM
-		// Title 已经在 createChunkWithMetadata 中通过 buildTitleFromHeaders 设置
 		if chunk.ChunkType == "info" {
-			// Info 类型：清空 Metadata（不需要存储）
-			// 注意：Title 已经是 headers 层级格式，保持不变
 			log.Printf("[Processor] Info chunk %d: keeping headers as title: %s", i, chunk.Title)
 			continue
 		}
-
-		// Code Mode: 调用 LLM 生成 Title 和 Description
-		input := llm.EnrichInput{
-			Content: chunk.ChunkText,
-			Headers: chunk.Title, // 当前 Title 是从 headers 构建的层级标题，作为上下文
-		}
-
-		output, err := global.LLM.Enrich(ctx, input)
-		if err != nil {
-			log.Printf("[Processor] Enrich failed for chunk %d: %v", i, err)
-			// 失败时使用 fallback：保持原有 Title，Description 为空
-			continue
-		}
-
-		// 更新 chunk
-		if output.Title != "" {
-			chunk.Title = output.Title
-		}
-		if output.Description != "" {
-			chunk.Description = output.Description
-		}
-
-		log.Printf("[Processor] Enriched code chunk %d: %s", i, output.Title)
+		tasks = append(tasks, enrichTask{idx: i, chunk: chunk})
 	}
 
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	// Worker Pool: 5 个 worker
+	const workerCount = 5
+	taskChan := make(chan enrichTask, len(tasks))
+	var wg sync.WaitGroup
+
+	// 启动 workers
+	for w := 0; w < workerCount; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for task := range taskChan {
+				input := llm.EnrichInput{
+					Content: task.chunk.ChunkText,
+					Headers: task.chunk.Title,
+				}
+
+				output, err := global.LLM.Enrich(ctx, input)
+				if err != nil {
+					log.Printf("[Processor] Enrich failed for chunk %d: %v", task.idx, err)
+					continue
+				}
+
+				if output.Title != "" {
+					task.chunk.Title = output.Title
+				}
+				if output.Description != "" {
+					task.chunk.Description = output.Description
+				}
+
+				log.Printf("[Processor] Enriched code chunk %d: %s", task.idx, output.Title)
+			}
+		}()
+	}
+
+	// 发送任务
+	for _, task := range tasks {
+		taskChan <- task
+	}
+	close(taskChan)
+
+	wg.Wait()
 	return nil
 }

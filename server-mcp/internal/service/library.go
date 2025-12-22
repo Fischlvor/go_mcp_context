@@ -392,14 +392,20 @@ func (s *LibraryService) CreateVersion(libraryID uint, version string) error {
 		return ErrNotFound
 	}
 
-	// 检查版本是否已存在（在 versions 数组或 document_uploads 表中）
+	// 检查版本是否已存在于 versions 数组
+	versionInArray := false
 	for _, v := range library.Versions {
 		if v == version {
-			return ErrVersionExists
+			versionInArray = true
+			break
 		}
 	}
 
-	// 也检查 document_uploads 表
+	if versionInArray {
+		return ErrVersionExists
+	}
+
+	// 检查 document_uploads 表是否有该版本的文档
 	var count int64
 	if err := global.DB.Table("document_uploads").
 		Where("library_id = ? AND version = ?", libraryID, version).
@@ -407,11 +413,7 @@ func (s *LibraryService) CreateVersion(libraryID uint, version string) error {
 		return err
 	}
 
-	if count > 0 {
-		return ErrVersionExists
-	}
-
-	// 添加版本到 versions 数组
+	// 添加版本到 versions 数组（即使文档已存在，也要确保版本在数组中）
 	library.Versions = append(library.Versions, version)
 
 	// 保存到数据库
