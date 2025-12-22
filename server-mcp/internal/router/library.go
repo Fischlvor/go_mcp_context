@@ -31,5 +31,8 @@ func (l *LibraryRouter) InitLibraryRouter(Router *gin.RouterGroup) {
 		libraryRouter.DELETE(":id/versions/:version", libraryApi.DeleteVersion)               // 删除版本
 		libraryRouter.POST(":id/versions/:version/refresh", libraryApi.RefreshVersion)        // 刷新版本（异步）
 		libraryRouter.POST(":id/versions/:version/refresh-sse", libraryApi.RefreshVersionSSE) // 刷新版本（SSE 实时推送）
+		// GitHub 导入
+		libraryRouter.GET("github/releases", libraryApi.GetGitHubReleases)   // 获取 GitHub 仓库版本列表
+		libraryRouter.POST(":id/import-github", libraryApi.ImportFromGitHub) // 从 GitHub 导入（SSE）
 	}
 }

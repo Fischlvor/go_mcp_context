@@ -70,3 +70,7 @@ zap:
   max_backups: 30
   max_age: 5
   is_console_print: true
+
+github:
+  token: ""   # GitHub Personal Access Token（可选，用于提高 API 速率限制）
+  proxy: ""   # 代理地址（可选，如 http://10.21.71.52:7890）

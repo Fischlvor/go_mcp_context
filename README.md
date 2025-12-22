@@ -107,11 +107,13 @@ GET /health
 ### 库管理
 
 ```
-GET    /api/v1/libraries      # 获取库列表
-POST   /api/v1/libraries      # 创建库
-GET    /api/v1/libraries/:id  # 获取库详情
-PUT    /api/v1/libraries/:id  # 更新库
-DELETE /api/v1/libraries/:id  # 删除库
+GET    /api/v1/libraries                        # 获取库列表
+POST   /api/v1/libraries                        # 创建库
+GET    /api/v1/libraries/:id                    # 获取库详情
+PUT    /api/v1/libraries/:id                    # 更新库
+DELETE /api/v1/libraries/:id                    # 删除库
+GET    /api/v1/libraries/github/releases        # 获取 GitHub 仓库版本列表
+POST   /api/v1/libraries/:id/github/import-sse  # 从 GitHub 导入文档（SSE）
 ```
 
 ### 文档管理
@@ -235,6 +237,7 @@ go-mcp-context/
 │   │   └── service/              # 业务逻辑
 │   │       ├── apikey.go         # API Key 服务
 │   │       ├── document.go       # 文档服务
+│   │       ├── github_import.go  # GitHub 导入服务
 │   │       ├── library.go        # 库服务
 │   │       ├── mcp.go            # MCP 服务
 │   │       ├── processor.go      # 文档处理器
@@ -245,8 +248,10 @@ go-mcp-context/
 │   │   ├── config/               # 配置管理
 │   │   ├── core/                 # 核心组件（Zap、Server）
 │   │   ├── embedding/            # Embedding 服务（OpenAI）
+│   │   ├── github/               # GitHub API 客户端
 │   │   ├── global/               # 全局变量
 │   │   ├── parser/               # 文档解析（Markdown）
+│   │   ├── storage/              # 存储服务（七牛云/本地）
 │   │   ├── utils/                # 工具函数
 │   │   └── vectorstore/          # 向量存储（pgvector）
 │   ├── scripts/                  # 脚本工具
@@ -306,15 +311,51 @@ go-mcp-context/
 - [x] 文档上传与处理
 - [x] 前端库管理界面
 
-### 第二阶段（第 3-4 周）🚧
+### 第二阶段（第 3-4 周）✅
 - [ ] PDF/DOCX 解析
 - [x] 混合搜索（向量 + BM25）
 - [x] 重排序算法（3 指标）
 - [x] Redis 缓存优化（Embedding 缓存 + 搜索结果缓存 + GetOrSet 模式）
 - [x] 前端搜索结果展示
+- [x] GitHub 仓库导入功能
 - [ ] MCP IDE 集成测试
 
 ## 📝 开发日志
+
+### 2025-12-21
+
+#### Added
+- **GitHub 仓库导入功能**
+  - 新增 `GitHubImportService`：从 GitHub 仓库直接导入 Markdown 文档
+  - 支持指定分支（branch）或标签（tag）导入
+  - 支持路径过滤（`path_filter`）和排除模式（`excludes`）
+  - 动态下载策略：小仓库使用多 API 并行下载，大仓库（>100MB）使用 tarball 流式下载
+  - SSE 实时进度推送：fetching_tree → downloading → processing → completed
+  - 自动创建版本：仅在有成功导入文件时才创建版本，避免孤立版本
+
+- **GitHub 版本列表 API**
+  - 新增 `GET /api/v1/libraries/github/releases?repo=owner/repo`
+  - 返回仓库信息（default_branch、description）和每个大版本的最新 tag
+
+- **GitHub 客户端**
+  - 新增 `pkg/github/client.go`：封装 GitHub API 调用
+  - 支持 Token 认证和代理配置
+  - 实现 `GetRepoInfo`、`GetTree`、`FilterTree`、`GetMajorVersions` 等方法
+  - 支持 tarball 流式下载（`DownloadTarballFiles`）
+
+- **LLM 富化并发优化**
+  - `enrichChunks` 改用 5 个 worker 并发处理，性能提升约 5 倍
+  - Worker Pool 模式：所有任务通过 channel 分发，固定 worker 数量
+
+#### Changed
+- **配置新增 GitHub 字段**
+  - `config.yaml` 新增 `github.token` 和 `github.proxy` 配置项
+  - 支持企业内网代理访问 GitHub API
+
+- **七牛云存储上传优化**
+  - 使用 `putExtra.MimeType` 设置 MIME 类型，替代 `putPolicy.MimeLimit`
+
+---
 
 ### 2025-12-19
 

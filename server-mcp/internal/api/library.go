@@ -227,3 +227,86 @@ func (l *LibraryApi) RefreshVersionSSE(c *gin.Context) {
 		sse.SendSuccess(status.Message, status)
 	}
 }
+
+// ==========================================
+// GitHub 导入相关 API
+// ==========================================
+
+// ImportFromGitHub 从 GitHub 导入文档（SSE 实时推送进度）
+func (l *LibraryApi) ImportFromGitHub(c *gin.Context) {
+	// 创建 SSE 写入器
+	sse, ok := response.NewSSEWriter(c)
+	if !ok {
+		c.JSON(500, gin.H{"error": "SSE not supported"})
+		return
+	}
+
+	// 解析库 ID
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		sse.SendError("无效的库ID")
+		return
+	}
+
+	// 解析请求参数
+	var req request.GitHubImportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		sse.SendError("参数错误: " + err.Error())
+		return
+	}
+
+	if req.Repo == "" {
+		sse.SendError("仓库名不能为空")
+		return
+	}
+
+	// 创建进度通道
+	progressChan := make(chan response.GitHubImportProgress, 100)
+
+	// 启动导入
+	githubService := service.NewGitHubImportService()
+	go func() {
+		if err := githubService.ImportFromGitHub(c.Request.Context(), uint(id), &req, progressChan); err != nil {
+			// 错误已通过 progressChan 发送
+		}
+	}()
+
+	// 监听进度并推送 SSE
+	for progress := range progressChan {
+		if progress.Stage == "failed" {
+			sse.SendError(progress.Message)
+			return
+		}
+		sse.SendSuccess(progress.Message, progress)
+	}
+}
+
+// GetGitHubReleases 获取 GitHub 仓库的版本列表
+func (l *LibraryApi) GetGitHubReleases(c *gin.Context) {
+	repo := c.Query("repo")
+	if repo == "" {
+		response.FailWithMessage("仓库名不能为空", c)
+		return
+	}
+
+	githubService := service.NewGitHubImportService()
+	versions, err := githubService.GetMajorVersions(c.Request.Context(), repo, 20)
+	if err != nil {
+		response.FailWithMessage("获取版本失败: "+err.Error(), c)
+		return
+	}
+
+	// 获取仓库信息
+	repoInfo, err := githubService.GetRepoInfo(c.Request.Context(), repo)
+	if err != nil {
+		response.FailWithMessage("获取仓库信息失败: "+err.Error(), c)
+		return
+	}
+
+	response.OkWithData(map[string]interface{}{
+		"repo":           repo,
+		"default_branch": repoInfo.DefaultBranch,
+		"description":    repoInfo.Description,
+		"versions":       versions,
+	}, c)
+}
