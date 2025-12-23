@@ -6,6 +6,7 @@ type ServiceGroup struct {
 	SearchService
 	MCPService
 	ApiKeyService
+	ActivityLogService
 }
 
 var ServiceGroupApp = new(ServiceGroup)

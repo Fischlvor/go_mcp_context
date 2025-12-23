@@ -10,7 +10,11 @@
       :is-logged-in="isLoggedIn" 
       :user-email="userEmail" 
       :user-plan="userPlan"
+      @add-docs="showAddDocsModal = true"
     />
+
+    <!-- Add Docs 弹窗 -->
+    <AddDocsModal v-model:visible="showAddDocsModal" />
 
     <!-- 主内容区 -->
     <main class="flex-grow pt-0">
@@ -433,11 +437,15 @@ import { ref, computed, h, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import AddDocsModal from '@/components/AddDocsModal.vue'
 import { useUser } from '@/stores/user'
 import { getAPIKeys, createAPIKey, deleteAPIKey, type APIKey, type APIKeyCreateResponse } from '@/api/apikey'
 
 // 用户状态
 const { isLoggedIn, userEmail, userPlan, initUserState } = useUser()
+
+// Add Docs 弹窗状态
+const showAddDocsModal = ref(false)
 
 // API Keys 状态
 const apiKeys = ref<APIKey[]>([])

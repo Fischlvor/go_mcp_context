@@ -6,12 +6,18 @@ import (
 	"io"
 	"log"
 	"regexp"
+	"strconv"
+	"sync"
 	"time"
 
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
+	"go-mcp-context/pkg/actlog"
 	"go-mcp-context/pkg/global"
+	"go-mcp-context/pkg/utils"
+
+	"github.com/lib/pq"
 )
 
 type LibraryService struct{}
@@ -94,13 +100,19 @@ func (s *LibraryService) Create(req *request.LibraryCreate) (*dbmodel.Library, e
 		sourceType = "local"
 	}
 
+	// 默认版本
+	defaultVersion := req.DefaultVersion
+	if defaultVersion == "" {
+		defaultVersion = "default"
+	}
+
 	library := &dbmodel.Library{
 		Name:           req.Name,
 		Description:    req.Description,
 		SourceType:     sourceType,
 		SourceURL:      req.SourceURL,
 		Status:         "active",
-		DefaultVersion: "default",
+		DefaultVersion: defaultVersion,
 		Versions:       []string{}, // versions 只存正常版本，不包含 default
 	}
 
@@ -118,6 +130,54 @@ func (s *LibraryService) GetByID(id uint) (*dbmodel.Library, error) {
 		return nil, err
 	}
 	return &library, nil
+}
+
+// getBySourceURL 根据 SourceURL 获取库（内部使用）
+func (s *LibraryService) getBySourceURL(sourceURL string) (*dbmodel.Library, error) {
+	var library dbmodel.Library
+	if err := global.DB.Where("source_url = ?", sourceURL).First(&library).Error; err != nil {
+		return nil, err
+	}
+	return &library, nil
+}
+
+// InitFromGitHub 从 GitHub URL 初始化创建库
+// 流程：解析 URL -> 验证连通性 -> 检查重复 -> 创建库
+// 返回：库信息、仓库默认分支、错误
+func (s *LibraryService) InitFromGitHub(ctx context.Context, githubURL string) (*dbmodel.Library, string, error) {
+	// 1. 解析 GitHub URL
+	repo, err := utils.ParseGitHubURL(githubURL)
+	if err != nil {
+		return nil, "", fmt.Errorf("无效的 GitHub URL: %w", err)
+	}
+
+	// 2. 验证仓库连通性
+	githubService := NewGitHubImportService()
+	repoInfo, err := githubService.GetRepoInfo(ctx, repo)
+	if err != nil {
+		return nil, "", fmt.Errorf("无法访问仓库: %w", err)
+	}
+
+	// 3. 检查是否已存在
+	existingLib, _ := s.getBySourceURL(repo)
+	if existingLib != nil {
+		return nil, "", fmt.Errorf("该库已存在: %s (ID: %d)", existingLib.Name, existingLib.ID)
+	}
+
+	// 4. 创建库（默认版本为 latest）
+	repoName := utils.ExtractRepoName(repo)
+	library, err := s.Create(&request.LibraryCreate{
+		Name:           repoName,
+		Description:    repoInfo.Description,
+		SourceType:     "github",
+		SourceURL:      repo,
+		DefaultVersion: "latest",
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("创建库失败: %w", err)
+	}
+
+	return library, repoInfo.DefaultBranch, nil
 }
 
 // Update 更新库
@@ -392,14 +452,20 @@ func (s *LibraryService) CreateVersion(libraryID uint, version string) error {
 		return ErrNotFound
 	}
 
-	// 检查版本是否已存在（在 versions 数组或 document_uploads 表中）
+	// 检查版本是否已存在于 versions 数组
+	versionInArray := false
 	for _, v := range library.Versions {
 		if v == version {
-			return ErrVersionExists
+			versionInArray = true
+			break
 		}
 	}
 
-	// 也检查 document_uploads 表
+	if versionInArray {
+		return ErrVersionExists
+	}
+
+	// 检查 document_uploads 表是否有该版本的文档
 	var count int64
 	if err := global.DB.Table("document_uploads").
 		Where("library_id = ? AND version = ?", libraryID, version).
@@ -407,11 +473,7 @@ func (s *LibraryService) CreateVersion(libraryID uint, version string) error {
 		return err
 	}
 
-	if count > 0 {
-		return ErrVersionExists
-	}
-
-	// 添加版本到 versions 数组
+	// 添加版本到 versions 数组（即使文档已存在，也要确保版本在数组中）
 	library.Versions = append(library.Versions, version)
 
 	// 保存到数据库
@@ -469,6 +531,33 @@ func (s *LibraryService) DeleteVersion(libraryID uint, version string) error {
 		return err
 	}
 
+	// 从 library.Versions 数组中移除该版本
+	newVersions := make([]string, 0, len(library.Versions))
+	for _, v := range library.Versions {
+		if v != version {
+			newVersions = append(newVersions, v)
+		}
+	}
+
+	// 更新 library
+	updates := map[string]interface{}{
+		"versions": pq.StringArray(newVersions),
+	}
+
+	// 如果删除的是默认版本，更新默认版本
+	if library.DefaultVersion == version {
+		if len(newVersions) > 0 {
+			updates["default_version"] = newVersions[0]
+		} else {
+			updates["default_version"] = ""
+		}
+	}
+
+	if err := tx.Model(&library).Updates(updates).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		return err
 	}
@@ -477,7 +566,10 @@ func (s *LibraryService) DeleteVersion(libraryID uint, version string) error {
 }
 
 // RefreshVersion 刷新版本（重新处理所有文档）
-func (s *LibraryService) RefreshVersion(libraryID uint, version string) error {
+func (s *LibraryService) RefreshVersion(libraryID uint, version string, actorID string) error {
+	// 生成任务 ID
+	taskID := utils.GenerateTaskID()
+
 	// 检查库是否存在
 	var library dbmodel.Library
 	if err := global.DB.First(&library, libraryID).Error; err != nil {
@@ -503,6 +595,25 @@ func (s *LibraryService) RefreshVersion(libraryID uint, version string) error {
 		return err
 	}
 
+	// 创建任务日志器
+	actLogger := actlog.NewTaskLogger(libraryID, taskID, version).
+		WithTarget("version", version).
+		WithActor(actorID)
+
+	// 同步写入"开始"日志（确保 API 返回前日志已入库）
+	startLog := &dbmodel.ActivityLog{
+		LibraryID:  libraryID,
+		ActorID:    actorID,
+		TaskID:     taskID,
+		Event:      actlog.EventVerRefresh,
+		Status:     actlog.StatusInfo,
+		Message:    fmt.Sprintf("开始刷新版本: %s (%d 个文档)", version, len(documents)),
+		Version:    version,
+		TargetType: "version",
+		TargetID:   version,
+	}
+	global.DB.Create(startLog)
+
 	// 开始事务
 	tx := global.DB.Begin()
 
@@ -526,34 +637,73 @@ func (s *LibraryService) RefreshVersion(libraryID uint, version string) error {
 		return err
 	}
 
-	// 异步重新处理所有文档（复用 ProcessDocumentAsync）
-	processor := &DocumentProcessor{}
-	for _, doc := range documents {
-		docCopy := doc // 避免闭包问题
-		go func() {
-			// 从存储下载文件内容
-			reader, err := global.Storage.Download(context.Background(), docCopy.FilePath)
-			if err != nil {
-				log.Printf("[RefreshVersion] Failed to download file %s: %v", docCopy.FilePath, err)
-				global.DB.Model(&docCopy).Update("status", "failed")
-				return
-			}
-			content, err := io.ReadAll(reader)
-			reader.Close()
-			if err != nil {
-				log.Printf("[RefreshVersion] Failed to read file content %s: %v", docCopy.FilePath, err)
-				global.DB.Model(&docCopy).Update("status", "failed")
-				return
-			}
+	// 异步重新处理所有文档
+	go func() {
+		processor := &DocumentProcessor{}
+		var wg sync.WaitGroup
+		var successCount, failCount int
+		var mu sync.Mutex
 
-			log.Printf("[RefreshVersion] Starting to reprocess document: %s (ID: %d)", docCopy.Title, docCopy.ID)
-			if err := processor.ProcessDocument(&docCopy, content); err != nil {
-				log.Printf("[RefreshVersion] Failed to process document %d: %v", docCopy.ID, err)
-				global.DB.Model(&docCopy).Update("status", "failed")
-			}
-			// 注意：ProcessDocument 内部会更新状态为 completed
-		}()
-	}
+		for _, doc := range documents {
+			wg.Add(1)
+			docCopy := doc // 避免闭包问题
+			go func() {
+				defer wg.Done()
+
+				// 创建文档级别日志器
+				docLogger := actLogger.WithTarget("document", strconv.FormatUint(uint64(docCopy.ID), 10))
+
+				// 从存储下载文件内容
+				reader, err := global.Storage.Download(context.Background(), docCopy.FilePath)
+				if err != nil {
+					log.Printf("[RefreshVersion] Failed to download file %s: %v", docCopy.FilePath, err)
+					docLogger.Warning(actlog.EventDocFailed, fmt.Sprintf("下载失败: %s", docCopy.Title))
+					global.DB.Model(&docCopy).Update("status", "failed")
+					mu.Lock()
+					failCount++
+					mu.Unlock()
+					return
+				}
+				content, err := io.ReadAll(reader)
+				reader.Close()
+				if err != nil {
+					log.Printf("[RefreshVersion] Failed to read file content %s: %v", docCopy.FilePath, err)
+					docLogger.Warning(actlog.EventDocFailed, fmt.Sprintf("读取失败: %s", docCopy.Title))
+					global.DB.Model(&docCopy).Update("status", "failed")
+					mu.Lock()
+					failCount++
+					mu.Unlock()
+					return
+				}
+
+				log.Printf("[RefreshVersion] Starting to reprocess document: %s (ID: %d)", docCopy.Title, docCopy.ID)
+				if err := processor.ProcessDocument(&docCopy, content, docLogger); err != nil {
+					log.Printf("[RefreshVersion] Failed to process document %d: %v", docCopy.ID, err)
+					global.DB.Model(&docCopy).Update("status", "failed")
+					mu.Lock()
+					failCount++
+					mu.Unlock()
+					return
+				}
+
+				mu.Lock()
+				successCount++
+				mu.Unlock()
+			}()
+		}
+
+		// 等待所有文档处理完成
+		wg.Wait()
+
+		// 记录刷新完成
+		if failCount == 0 {
+			actLogger.Success(actlog.EventVerRefresh, fmt.Sprintf("刷新完成: %s (成功 %d)", version, successCount))
+		} else {
+			actLogger.Warning(actlog.EventVerRefresh, fmt.Sprintf("刷新完成: %s (成功 %d, 失败 %d)", version, successCount, failCount))
+		}
+
+		log.Printf("[RefreshVersion] Completed reprocessing for library %d version %s: success=%d, fail=%d", libraryID, version, successCount, failCount)
+	}()
 
 	log.Printf("[RefreshVersion] Started reprocessing %d documents for library %d version %s", len(documents), libraryID, version)
 
@@ -562,8 +712,14 @@ func (s *LibraryService) RefreshVersion(libraryID uint, version string) error {
 
 // RefreshVersionWithCallback 刷新版本（带 SSE 状态回调，无感知更新）
 // 使用批次版本号实现原子切换，确保刷新过程中检索不受影响
-func (s *LibraryService) RefreshVersionWithCallback(libraryID uint, version string, statusChan chan response.RefreshStatus) {
+func (s *LibraryService) RefreshVersionWithCallback(libraryID uint, version string, actorID string, statusChan chan response.RefreshStatus) {
 	defer close(statusChan)
+
+	// 生成任务 ID 和日志器
+	taskID := utils.GenerateTaskID()
+	actLogger := actlog.NewTaskLogger(libraryID, taskID, version).
+		WithTarget("version", version).
+		WithActor(actorID)
 
 	// 检查库是否存在
 	var library dbmodel.Library
@@ -586,6 +742,7 @@ func (s *LibraryService) RefreshVersionWithCallback(libraryID uint, version stri
 	}
 
 	total := len(documents)
+	actLogger.Info(actlog.EventVerRefresh, fmt.Sprintf("开始刷新版本: %s (%d 个文档，无感知模式)", version, total))
 	statusChan <- response.RefreshStatus{
 		Stage:   "started",
 		Current: 0,
@@ -652,7 +809,8 @@ func (s *LibraryService) RefreshVersionWithCallback(libraryID uint, version stri
 		}
 
 		// 处理文档，生成 chunks（不写入数据库）
-		chunks, totalTokens, err := processor.ProcessDocumentForRefresh(&docCopy, content, batchVersion)
+		docLogger := actLogger.WithTarget("document", strconv.FormatUint(uint64(docCopy.ID), 10))
+		chunks, totalTokens, err := processor.ProcessDocumentForRefresh(&docCopy, content, batchVersion, docLogger)
 		if err != nil {
 			log.Printf("[RefreshVersion] Failed to process document %d: %v", doc.ID, err)
 			results = append(results, docResult{doc: &docCopy, err: err})
@@ -766,6 +924,13 @@ func (s *LibraryService) RefreshVersionWithCallback(libraryID uint, version stri
 	searchService := &SearchService{}
 	if err := searchService.InvalidateLibraryCache(libraryID, version); err != nil {
 		log.Printf("[RefreshVersion] WARNING: Failed to invalidate cache: %v", err)
+	}
+
+	// 记录完成日志
+	if successCount == total {
+		actLogger.Success(actlog.EventVerRefresh, fmt.Sprintf("刷新完成: %s (成功 %d)", version, successCount))
+	} else {
+		actLogger.Warning(actlog.EventVerRefresh, fmt.Sprintf("刷新完成: %s (成功 %d, 失败 %d)", version, successCount, total-successCount))
 	}
 
 	statusChan <- response.RefreshStatus{

@@ -77,14 +77,16 @@ func (q *QiniuStorage) Upload(ctx context.Context, key string, reader io.Reader,
 	putPolicy := storage.PutPolicy{
 		Scope: fmt.Sprintf("%s:%s", q.bucket, key),
 	}
-	if contentType != "" {
-		putPolicy.MimeLimit = contentType
-	}
 	upToken := putPolicy.UploadToken(q.mac)
 
 	formUploader := storage.NewFormUploader(q.cfg)
 	ret := storage.PutRet{}
 	putExtra := storage.PutExtra{}
+
+	// 设置上传文件的 MIME 类型
+	if contentType != "" {
+		putExtra.MimeType = contentType
+	}
 
 	err := formUploader.Put(ctx, &ret, upToken, key, reader, size, &putExtra)
 	if err != nil {

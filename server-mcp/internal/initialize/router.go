@@ -52,9 +52,10 @@ func InitRouter() *gin.Engine {
 	// API v1 公开路由（无需认证）- 查询类接口 + 认证接口
 	v1Public := r.Group("/api/v1")
 	{
-		routerGroup.InitAuthRouter(v1Public)           // 认证相关（SSO 登录、回调、登出）
-		routerGroup.InitLibraryPublicRouter(v1Public)  // GET 库列表、详情
-		routerGroup.InitDocumentPublicRouter(v1Public) // GET 文档详情（含搜索，通过 topic 参数）
+		routerGroup.InitAuthRouter(v1Public)              // 认证相关（SSO 登录、回调、登出）
+		routerGroup.InitLibraryPublicRouter(v1Public)     // GET 库列表、详情
+		routerGroup.InitDocumentPublicRouter(v1Public)    // GET 文档详情（含搜索，通过 topic 参数）
+		routerGroup.InitActivityLogPublicRouter(v1Public) // GET 活动日志
 		// routerGroup.InitSearchPublicRouter(v1Public) // 已废弃，搜索功能合并到 GetChunks
 	}
 

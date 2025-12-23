@@ -107,11 +107,13 @@ GET /health
 ### 库管理
 
 ```
-GET    /api/v1/libraries      # 获取库列表
-POST   /api/v1/libraries      # 创建库
-GET    /api/v1/libraries/:id  # 获取库详情
-PUT    /api/v1/libraries/:id  # 更新库
-DELETE /api/v1/libraries/:id  # 删除库
+GET    /api/v1/libraries                        # 获取库列表
+POST   /api/v1/libraries                        # 创建库
+GET    /api/v1/libraries/:id                    # 获取库详情
+PUT    /api/v1/libraries/:id                    # 更新库
+DELETE /api/v1/libraries/:id                    # 删除库
+GET    /api/v1/libraries/github/releases        # 获取 GitHub 仓库版本列表
+POST   /api/v1/libraries/:id/github/import-sse  # 从 GitHub 导入文档（SSE）
 ```
 
 ### 文档管理
@@ -235,6 +237,7 @@ go-mcp-context/
 │   │   └── service/              # 业务逻辑
 │   │       ├── apikey.go         # API Key 服务
 │   │       ├── document.go       # 文档服务
+│   │       ├── github_import.go  # GitHub 导入服务
 │   │       ├── library.go        # 库服务
 │   │       ├── mcp.go            # MCP 服务
 │   │       ├── processor.go      # 文档处理器
@@ -245,8 +248,10 @@ go-mcp-context/
 │   │   ├── config/               # 配置管理
 │   │   ├── core/                 # 核心组件（Zap、Server）
 │   │   ├── embedding/            # Embedding 服务（OpenAI）
+│   │   ├── github/               # GitHub API 客户端
 │   │   ├── global/               # 全局变量
 │   │   ├── parser/               # 文档解析（Markdown）
+│   │   ├── storage/              # 存储服务（七牛云/本地）
 │   │   ├── utils/                # 工具函数
 │   │   └── vectorstore/          # 向量存储（pgvector）
 │   ├── scripts/                  # 脚本工具
@@ -259,9 +264,10 @@ go-mcp-context/
 │   │   ├── api/                  # API 接口
 │   │   │   ├── apikey.ts         # API Key 接口
 │   │   │   ├── document.ts       # 文档接口
-│   │   │   ├── library.ts        # 库接口
+│   │   │   ├── library.ts        # 库接口（含 GitHub 导入）
 │   │   │   └── search.ts         # 搜索接口
 │   │   ├── components/           # Vue 组件
+│   │   │   ├── AddVersionModal.vue  # 版本添加弹窗（支持 Local/GitHub）
 │   │   │   ├── AppHeader.vue     # 顶部导航
 │   │   │   ├── AppFooter.vue     # 底部栏
 │   │   │   └── PersonalDropdown.vue  # 用户下拉菜单
@@ -306,15 +312,112 @@ go-mcp-context/
 - [x] 文档上传与处理
 - [x] 前端库管理界面
 
-### 第二阶段（第 3-4 周）🚧
+### 第二阶段（第 3-4 周）✅
 - [ ] PDF/DOCX 解析
 - [x] 混合搜索（向量 + BM25）
 - [x] 重排序算法（3 指标）
 - [x] Redis 缓存优化（Embedding 缓存 + 搜索结果缓存 + GetOrSet 模式）
 - [x] 前端搜索结果展示
+- [x] GitHub 仓库导入功能
 - [ ] MCP IDE 集成测试
 
 ## 📝 开发日志
+
+### 2025-12-23
+
+#### Added
+- **活动日志系统 (Activity Log)**
+  - 新增 `pkg/actlog` 包：异步批量活动日志记录
+    - `Buffer`：缓冲区实现，支持批量写入（默认 50 条/批，2 秒刷新）
+    - `TaskLogger`：任务级别日志器，预填充 libraryID、taskID、version 等公共字段
+    - 支持 `WithActor`、`WithTarget`、`WithTaskID`、`WithVersion` 等选项
+  - 新增 `ActivityLog` 数据库模型：记录库操作事件
+  - 新增 `GET /api/v1/logs` API：获取库的最新任务日志
+  - 前端 `detail.vue` 新增 Logs Tab：终端风格日志面板，支持自动轮询
+
+- **GitHub 快速导入功能**
+  - 新增 `POST /api/v1/libraries/github/init-import` API
+    - 输入 GitHub URL → 自动解析仓库 → 验证连通性 → 检查重复 → 创建库 → 异步导入
+    - 返回 `library_id` 和 `version`，前端跳转到 logs tab 查看进度
+  - 新增 `AddDocsModal.vue` 组件：支持 GitHub 和 Local 两种导入方式
+  - 新增 `pkg/utils/github.go`：`ParseGitHubURL`、`ExtractRepoName` 工具函数
+  - 新增 `pkg/utils/task_id.go`：`GenerateTaskID` 生成 ULID 格式任务 ID
+
+- **版本添加弹窗重构**
+  - 新增 `AddVersionModal.vue` 组件：统一 Local 和 GitHub 两种模式
+    - Local 模式：输入版本名创建空版本
+    - GitHub 模式：选择 tag 自动导入
+  - 版本创建成功后跳转到 logs tab 查看进度
+
+#### Changed
+- **GitHub 导入路由统一**
+  - `POST /libraries/:id/import-github` → `POST /libraries/github/import?id=xxx`
+  - `POST /libraries/:id/import-github-sse` → `POST /libraries/github/import-sse?id=xxx`
+  - 新增 `POST /libraries/github/init-import`（快速导入）
+
+- **活动日志集成**
+  - `ImportFromGitHub`：记录 `github.import.start`、`github.import.download`、`github.import.complete` 等事件
+  - `RefreshVersion`：记录 `version.refresh` 事件
+  - `InitImportFromGitHub`：记录 `library.create` 和 `github.import.start` 事件
+  - 所有日志包含 `actor_id`、`task_id`、`version`、`target_type`、`target_id` 等字段
+
+- **API 层同步写入开始日志**
+  - 在 goroutine 启动前同步写入"开始"日志，确保 API 返回前日志已入库
+  - 解决前端跳转后日志显示 `status: complete` 的问题
+
+- **前端 Tab 切换优化**
+  - `onMounted` 根据当前 tab 加载对应数据，避免不必要的请求
+  - 版本变化时只加载当前 tab 的数据
+  - 切换到 context tab 时，如果没有搜索结果则自动加载
+
+- **LibraryCreate 支持 DefaultVersion**
+  - `LibraryCreate` 请求新增 `default_version` 字段
+  - GitHub 导入时默认版本设为 `latest`
+
+#### Fixed
+- **版本重复检查**
+  - `ImportFromGitHub` API 在启动 goroutine 前检查版本是否已存在
+  - 避免重复导入同一版本
+
+- **TaskID 统一**
+  - API 层生成 taskID 并传递给服务方法，避免同一任务出现多个 taskID
+
+---
+
+### 2025-12-21
+
+#### Added
+- **GitHub 仓库导入功能**
+  - 新增 `GitHubImportService`：从 GitHub 仓库直接导入 Markdown 文档
+  - 支持指定分支（branch）或标签（tag）导入
+  - 支持路径过滤（`path_filter`）和排除模式（`excludes`）
+  - 动态下载策略：小仓库使用多 API 并行下载，大仓库（>100MB）使用 tarball 流式下载
+  - SSE 实时进度推送：fetching_tree → downloading → processing → completed
+  - 自动创建版本：仅在有成功导入文件时才创建版本，避免孤立版本
+
+- **GitHub 版本列表 API**
+  - 新增 `GET /api/v1/libraries/github/releases?repo=owner/repo`
+  - 返回仓库信息（default_branch、description）和每个大版本的最新 tag
+
+- **GitHub 客户端**
+  - 新增 `pkg/github/client.go`：封装 GitHub API 调用
+  - 支持 Token 认证和代理配置
+  - 实现 `GetRepoInfo`、`GetTree`、`FilterTree`、`GetMajorVersions` 等方法
+  - 支持 tarball 流式下载（`DownloadTarballFiles`）
+
+- **LLM 富化并发优化**
+  - `enrichChunks` 改用 5 个 worker 并发处理，性能提升约 5 倍
+  - Worker Pool 模式：所有任务通过 channel 分发，固定 worker 数量
+
+#### Changed
+- **配置新增 GitHub 字段**
+  - `config.yaml` 新增 `github.token` 和 `github.proxy` 配置项
+  - 支持企业内网代理访问 GitHub API
+
+- **七牛云存储上传优化**
+  - 使用 `putExtra.MimeType` 设置 MIME 类型，替代 `putPolicy.MimeLimit`
+
+---
 
 ### 2025-12-19
 
