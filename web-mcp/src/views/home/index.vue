@@ -84,7 +84,21 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-stone-200">
-                  <tr v-if="libraries.length === 0 && !loading">
+                  <!-- Trending Coming Soon -->
+                  <tr v-if="activeTab === 'trending'">
+                    <td colspan="6" class="py-16 text-center">
+                      <div class="flex flex-col items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400">
+                          <path d="M3 17l6 -6l4 4l8 -8"></path>
+                          <path d="M14 7l7 0l0 7"></path>
+                        </svg>
+                        <p class="text-lg font-medium text-stone-600">Coming Soon</p>
+                        <p class="text-sm text-stone-400">Trending libraries will be available soon</p>
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- Empty State -->
+                  <tr v-else-if="libraries.length === 0 && !loading">
                     <td colspan="6" class="py-16 text-center">
                       <div class="flex flex-col items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-stone-300">
@@ -225,7 +239,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
@@ -288,12 +302,19 @@ const form = reactive({
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const fetchLibraries = async () => {
+  // Trending tab 暂不加载数据
+  if (activeTab.value === 'trending') {
+    libraries.value = []
+    return
+  }
+
   loading.value = true
   try {
     const res = await getLibraries({
       name: searchQuery.value || undefined,
       page: page.value,
-      page_size: pageSize.value
+      page_size: pageSize.value,
+      sort: activeTab.value === 'popular' ? 'popular' : undefined
     })
     libraries.value = res.list || []
     total.value = res.total
@@ -424,6 +445,12 @@ const formatDate = (dateStr: string) => {
   if (months < 12) return `${months} month${months > 1 ? 's' : ''}`
   return `${years} year${years > 1 ? 's' : ''}`
 }
+
+// 监听 tab 切换
+watch(activeTab, () => {
+  page.value = 1
+  fetchLibraries()
+})
 
 onMounted(() => {
   fetchLibraries()

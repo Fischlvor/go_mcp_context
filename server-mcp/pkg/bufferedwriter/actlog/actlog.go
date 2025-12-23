@@ -18,11 +18,24 @@ import (
 	"sync"
 	"time"
 
+	"go-mcp-context/pkg/bufferedwriter"
+
 	"gorm.io/gorm"
 )
 
+// BufferConfig 缓冲区配置
+type BufferConfig = bufferedwriter.Config
+
+// DefaultBufferConfig 默认配置
+var DefaultBufferConfig = bufferedwriter.Config{
+	Size:     1000,
+	Batch:    50,
+	Interval: 2 * time.Second,
+}
+
 var (
-	defaultBuffer *Buffer
+	defaultBuffer *bufferedwriter.Buffer[*LogEntry]
+	defaultWriter *DBWriter
 	initOnce      sync.Once
 	mu            sync.RWMutex
 )
@@ -30,17 +43,9 @@ var (
 // Init 初始化活动日志系统
 func Init(db *gorm.DB) {
 	initOnce.Do(func() {
-		writer := NewDBWriter(db)
-		defaultBuffer = NewBuffer(writer, DefaultBufferConfig)
+		defaultWriter = NewDBWriter(db)
+		defaultBuffer = bufferedwriter.New("actlog", defaultWriter, DefaultBufferConfig)
 		log.Println("[actlog] Activity logger initialized")
-	})
-}
-
-// InitWithWriter 使用自定义 Writer 初始化
-func InitWithWriter(writer Writer, config BufferConfig) {
-	initOnce.Do(func() {
-		defaultBuffer = NewBuffer(writer, config)
-		log.Println("[actlog] Activity logger initialized with custom writer")
 	})
 }
 

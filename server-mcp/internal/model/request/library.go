@@ -7,6 +7,7 @@ type LibraryCreate struct {
 	SourceType     string `json:"source_type"`     // github, website, local（默认 local）
 	SourceURL      string `json:"source_url"`      // vuejs/docs 或 vuejs.org/guide
 	DefaultVersion string `json:"default_version"` // 默认版本（默认 default）
+	CreatedBy      string `json:"-"`               // 创建者 UUID（从 JWT 获取，不从请求体读取）
 }
 
 // LibraryUpdate 更新库请求
@@ -22,6 +23,7 @@ type LibraryUpdate struct {
 type LibraryList struct {
 	Name   *string `json:"name" form:"name"`
 	Status *string `json:"status" form:"status"`
+	Sort   *string `json:"sort" form:"sort"` // popular, recent（默认 recent）
 	PageInfo
 }
 

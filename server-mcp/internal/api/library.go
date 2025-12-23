@@ -10,7 +10,7 @@ import (
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
 	"go-mcp-context/internal/service"
-	"go-mcp-context/pkg/actlog"
+	"go-mcp-context/pkg/bufferedwriter/actlog"
 	"go-mcp-context/pkg/global"
 	"go-mcp-context/pkg/utils"
 
@@ -43,6 +43,9 @@ func (l *LibraryApi) Create(c *gin.Context) {
 		response.FailWithMessage("参数错误: "+err.Error(), c)
 		return
 	}
+
+	// 设置创建者
+	req.CreatedBy = utils.GetUUID(c).String()
 
 	library, err := libraryService.Create(&req)
 	if err != nil {
@@ -433,14 +436,14 @@ func (l *LibraryApi) InitImportFromGitHub(c *gin.Context) {
 	}
 
 	// 1. 初始化创建库（解析URL、验证连通性、检查重复、创建）
-	library, defaultBranch, err := libraryService.InitFromGitHub(c.Request.Context(), req.GitHubURL)
+	userUUID := utils.GetUUID(c).String()
+	library, defaultBranch, err := libraryService.InitFromGitHub(c.Request.Context(), req.GitHubURL, userUUID)
 	if err != nil {
 		response.FailWithMessage(err.Error(), c)
 		return
 	}
 
 	// 2. 记录活动日志
-	userUUID := utils.GetUUID(c).String()
 	taskID := utils.GenerateTaskID()
 
 	actlog.Success(library.ID, actlog.EventLibCreate, fmt.Sprintf("从 GitHub 创建库: %s", library.Name),

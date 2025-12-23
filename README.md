@@ -243,11 +243,15 @@ go-mcp-context/
 │   │       ├── processor.go      # 文档处理器
 │   │       └── search.go         # 搜索服务
 │   ├── pkg/                      # 公共包
-│   │   ├── cache/                # 缓存接口（Redis）
+│   │   ├── bufferedwriter/       # 异步批量写入框架
+│   │   │   ├── buffer.go         # 通用缓冲区（泛型 Buffer[T] + Writer[T] 接口）
+│   │   │   ├── actlog/           # 活动日志写入器
+│   │   │   └── stats/            # MCP 统计写入器
+│   │   ├── cache/                # 缓存接口（Redis + TagAwareCache）
 │   │   ├── chunker/              # 文档分块（TokenBased）
 │   │   ├── config/               # 配置管理
 │   │   ├── core/                 # 核心组件（Zap、Server）
-│   │   ├── embedding/            # Embedding 服务（OpenAI）
+│   │   ├── embedding/            # Embedding 服务（OpenAI + 缓存）
 │   │   ├── github/               # GitHub API 客户端
 │   │   ├── global/               # 全局变量
 │   │   ├── parser/               # 文档解析（Markdown）
@@ -324,6 +328,47 @@ go-mcp-context/
 ## 📝 开发日志
 
 ### 2025-12-23
+
+#### Added
+- **MCP 调用统计系统**
+  - 新增 `pkg/bufferedwriter` 公共包：提取通用异步批量写入逻辑
+    - `Buffer[T]`：泛型缓冲区，支持批量写入 + 定时刷新
+    - `Writer[T]`：写入器接口（`WriteBatch` + `Close`）
+  - 新增 `pkg/bufferedwriter/stats` 包：MCP 调用统计
+    - `stats.Increment(metricName, delta)`：全局统计
+    - `stats.IncrementWithLibrary(libraryID, metricName, delta)`：库级统计
+    - 支持 PostgreSQL upsert（`ON CONFLICT` 累加）
+  - 重构 `pkg/bufferedwriter/actlog`：复用公共 Buffer
+  - 新增 `Statistics` 模型常量：`MetricMCPGetLibraryDocs`、`MetricMCPSearchLibraries`
+  - MCP 接口 `search-libraries` 和 `get-library-docs` 自动记录调用次数
+
+- **个人统计 API**
+  - 新增 `GET /api/v1/stats/my`：获取当前用户统计（库数、文档数、Token 数、MCP 调用数）
+  - 新增 `StatsService.GetUserStats()`：带 5 分钟缓存
+  - 前端 Dashboard 展示个人统计卡片
+
+- **库列表热门排序**
+  - `GET /api/v1/libraries` 支持 `sort=popular` 参数
+  - 按 MCP 调用次数（`mcp.func.get_library_docs`）降序排序
+  - 前端首页 Popular Tab 使用热门排序
+
+- **MCP 搜索版本过滤**
+  - `get-library-docs` 现在正确按版本过滤文档
+  - `SearchDocuments` 和 `GetChunksByLibrary` 支持 `version` 参数
+
+#### Changed
+- **bufferedwriter 重构**
+  - `pkg/actlog` → `pkg/bufferedwriter/actlog`
+  - `pkg/stats` → `pkg/bufferedwriter/stats`
+  - 两者共用 `bufferedwriter.Buffer[T]` 和 `bufferedwriter.Writer[T]` 接口
+
+- **Library 模型新增 CreatedBy**
+  - `Library` 新增 `created_by` 字段，记录创建者 UUID
+  - `InitFromGitHub` 传递 `createdBy` 参数
+
+---
+
+### 2025-12-22
 
 #### Added
 - **活动日志系统 (Activity Log)**
