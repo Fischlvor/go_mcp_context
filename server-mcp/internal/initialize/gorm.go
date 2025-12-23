@@ -46,6 +46,7 @@ func InitTables() {
 		&dbmodel.SearchCache{},
 		&dbmodel.APIKey{},
 		&dbmodel.Statistics{},
+		&dbmodel.ActivityLog{},
 	); err != nil {
 		fmt.Printf("Failed to migrate database: %v\n", err)
 		os.Exit(1)
@@ -76,5 +77,15 @@ func createIndexes() {
 	`
 	if err := global.DB.Exec(ftsSQL).Error; err != nil {
 		fmt.Printf("Warning: Could not create full-text index: %v\n", err)
+	}
+
+	// 活动日志 BRIN 索引（时序数据优化）
+	brinSQL := `
+		CREATE INDEX IF NOT EXISTS idx_logs_library_time 
+		ON activity_logs 
+		USING BRIN(library_id, created_at)
+	`
+	if err := global.DB.Exec(brinSQL).Error; err != nil {
+		fmt.Printf("Warning: Could not create BRIN index for activity_logs: %v\n", err)
 	}
 }

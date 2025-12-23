@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
+	"go-mcp-context/pkg/actlog"
 	"go-mcp-context/pkg/github"
 	"go-mcp-context/pkg/global"
+	"go-mcp-context/pkg/utils"
 )
 
 // GitHubImportService GitHub 导入服务
@@ -36,14 +39,29 @@ func (s *GitHubImportService) GetMajorVersions(ctx context.Context, repo string,
 	return s.client.GetMajorVersions(ctx, repo, maxCount)
 }
 
-// ImportFromGitHub 从 GitHub 导入文档
-func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID uint, req *request.GitHubImportRequest, progressChan chan response.GitHubImportProgress) error {
-	defer close(progressChan)
+// sendProgress 安全发送进度（channel 可为 nil）
+func sendProgress(ch chan response.GitHubImportProgress, progress response.GitHubImportProgress) {
+	if ch != nil {
+		ch <- progress
+	}
+}
+
+// ImportFromGitHub 从 GitHub 导入文档（progressChan 可为 nil）
+func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID uint, req *request.GitHubImportRequest, actorID string, progressChan chan response.GitHubImportProgress) error {
+	if progressChan != nil {
+		defer close(progressChan)
+	}
+
+	// 使用传入的任务 ID，或生成新的
+	taskID := req.TaskID
+	if taskID == "" {
+		taskID = utils.GenerateTaskID()
+	}
 
 	// 1. 检查库是否存在
 	var library dbmodel.Library
 	if err := global.DB.First(&library, libraryID).Error; err != nil {
-		progressChan <- response.GitHubImportProgress{Stage: "failed", Message: "库不存在"}
+		sendProgress(progressChan, response.GitHubImportProgress{Stage: "failed", Message: "库不存在"})
 		return ErrNotFound
 	}
 
@@ -56,34 +74,34 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 		// 获取默认分支
 		repoInfo, err := s.client.GetRepoInfo(ctx, req.Repo)
 		if err != nil {
-			progressChan <- response.GitHubImportProgress{Stage: "failed", Message: "获取仓库信息失败: " + err.Error()}
+			sendProgress(progressChan, response.GitHubImportProgress{Stage: "failed", Message: "获取仓库信息失败: " + err.Error()})
 			return err
 		}
 		ref = repoInfo.DefaultBranch
 	}
 
-	progressChan <- response.GitHubImportProgress{Stage: "fetching_tree", Message: fmt.Sprintf("获取目录树: %s@%s", req.Repo, ref)}
+	sendProgress(progressChan, response.GitHubImportProgress{Stage: "fetching_tree", Message: fmt.Sprintf("获取目录树: %s@%s", req.Repo, ref)})
 
 	// 3. 获取目录树
 	tree, err := s.client.GetTree(ctx, req.Repo, ref)
 	if err != nil {
-		progressChan <- response.GitHubImportProgress{Stage: "failed", Message: "获取目录树失败: " + err.Error()}
+		sendProgress(progressChan, response.GitHubImportProgress{Stage: "failed", Message: "获取目录树失败: " + err.Error()})
 		return err
 	}
 
 	// 4. 过滤文件
 	files := s.client.FilterTree(tree, req.PathFilter, req.Excludes)
 	if len(files) == 0 {
-		progressChan <- response.GitHubImportProgress{Stage: "failed", Message: "没有找到文档文件"}
+		sendProgress(progressChan, response.GitHubImportProgress{Stage: "failed", Message: "没有找到文档文件"})
 		return fmt.Errorf("no document files found")
 	}
 
-	progressChan <- response.GitHubImportProgress{
+	sendProgress(progressChan, response.GitHubImportProgress{
 		Stage:   "downloading",
 		Total:   len(files),
 		Current: 0,
 		Message: fmt.Sprintf("找到 %d 个文档文件", len(files)),
-	}
+	})
 
 	// 5. 确定版本名
 	version := req.Version
@@ -95,13 +113,23 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 		}
 	}
 
-	// 5.1 检查版本是否已存在（版本将在有成功文件后创建）
+	// 创建任务日志器
+	actLogger := actlog.NewTaskLogger(libraryID, taskID, version).
+		WithTarget("version", version).
+		WithActor(actorID)
+
+	// 5.1 检查版本是否已存在
 	versionExists := false
 	for _, v := range library.Versions {
 		if v == version {
 			versionExists = true
 			break
 		}
+	}
+	// 如果版本已存在且不是默认版本，拒绝重复导入
+	if versionExists {
+		sendProgress(progressChan, response.GitHubImportProgress{Stage: "failed", Message: fmt.Sprintf("版本 %s 已存在", version)})
+		return ErrVersionExists
 	}
 
 	// 6. 获取仓库大小，选择下载方式
@@ -121,10 +149,11 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 
 	if useTarball {
 		// === 大仓库：使用 tarball 流式下载 ===
-		progressChan <- response.GitHubImportProgress{
+		actLogger.Info(actlog.EventGHImportDownload, fmt.Sprintf("大仓库（%dMB），使用 tarball 流式下载", repoSizeKB/1024))
+		sendProgress(progressChan, response.GitHubImportProgress{
 			Stage:   "downloading",
 			Message: fmt.Sprintf("大仓库（%dMB），使用 tarball 流式下载", repoSizeKB/1024),
-		}
+		})
 
 		// 构建文件过滤器（基于已过滤的文件列表）
 		allowedPaths := make(map[string]bool)
@@ -139,22 +168,23 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 
 		// 处理文件
 		for file := range fileChan {
-			successCount, failCount = s.processFile(ctx, file.Path, file.Content, library, version, req, processor, progressChan, successCount, failCount, len(files))
+			successCount, failCount = s.processFile(ctx, file.Path, file.Content, library, version, taskID, actLogger, req, processor, progressChan, successCount, failCount, len(files))
 		}
 
 		// 检查错误
 		if err := <-errChan; err != nil {
-			progressChan <- response.GitHubImportProgress{
+			sendProgress(progressChan, response.GitHubImportProgress{
 				Stage:   "warning",
 				Message: fmt.Sprintf("tarball 下载出错: %s", err.Error()),
-			}
+			})
 		}
 	} else {
 		// === 小仓库：使用多 API 并行下载 ===
-		progressChan <- response.GitHubImportProgress{
+		actLogger.Info(actlog.EventGHImportDownload, fmt.Sprintf("开始下载: %d 个文件", len(files)))
+		sendProgress(progressChan, response.GitHubImportProgress{
 			Stage:   "downloading",
 			Message: fmt.Sprintf("开始下载 %s@%s（%d 个文件）", req.Repo, version, len(files)),
-		}
+		})
 
 		type downloadResult struct {
 			path    string
@@ -186,16 +216,17 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 		for result := range results {
 			if result.err != nil {
 				failCount++
-				progressChan <- response.GitHubImportProgress{
+				actLogger.Warning(actlog.EventGHImportDownload, fmt.Sprintf("下载失败: %s", result.path))
+				sendProgress(progressChan, response.GitHubImportProgress{
 					Stage:    "downloading",
 					Current:  successCount + failCount,
 					Total:    len(files),
 					FileName: result.path,
 					Message:  fmt.Sprintf("下载失败: %s - %s", result.path, result.err.Error()),
-				}
+				})
 				continue
 			}
-			successCount, failCount = s.processFile(ctx, result.path, result.content, library, version, req, processor, progressChan, successCount, failCount, len(files))
+			successCount, failCount = s.processFile(ctx, result.path, result.content, library, version, taskID, actLogger, req, processor, progressChan, successCount, failCount, len(files))
 		}
 	}
 
@@ -206,22 +237,22 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 			libService := &LibraryService{}
 			if err := libService.CreateVersion(libraryID, version); err != nil {
 				if err == ErrVersionExists {
-					progressChan <- response.GitHubImportProgress{
+					sendProgress(progressChan, response.GitHubImportProgress{
 						Stage:   "info",
 						Message: fmt.Sprintf("版本 %s 已存在", version),
-					}
+					})
 				} else {
 					// 版本创建失败，但文件已上传，记录警告
-					progressChan <- response.GitHubImportProgress{
+					sendProgress(progressChan, response.GitHubImportProgress{
 						Stage:   "warning",
 						Message: fmt.Sprintf("版本创建失败: %s，但文件已上传", err.Error()),
-					}
+					})
 				}
 			} else {
-				progressChan <- response.GitHubImportProgress{
+				sendProgress(progressChan, response.GitHubImportProgress{
 					Stage:   "info",
 					Message: fmt.Sprintf("版本 %s 创建成功", version),
-				}
+				})
 			}
 		}
 
@@ -232,12 +263,19 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 		})
 	}
 
-	progressChan <- response.GitHubImportProgress{
+	// 记录导入完成
+	if failCount == 0 {
+		actLogger.Success(actlog.EventGHImportComplete, fmt.Sprintf("导入完成: %s@%s (成功 %d)", req.Repo, version, successCount))
+	} else {
+		actLogger.Warning(actlog.EventGHImportComplete, fmt.Sprintf("导入完成: %s@%s (成功 %d, 失败 %d)", req.Repo, version, successCount, failCount))
+	}
+
+	sendProgress(progressChan, response.GitHubImportProgress{
 		Stage:   "completed",
 		Current: successCount + failCount,
 		Total:   len(files),
 		Message: fmt.Sprintf("导入完成：成功 %d，失败 %d", successCount, failCount),
-	}
+	})
 
 	return nil
 }
@@ -249,6 +287,8 @@ func (s *GitHubImportService) processFile(
 	content []byte,
 	library dbmodel.Library,
 	version string,
+	taskID string,
+	actLogger *actlog.TaskLogger,
 	req *request.GitHubImportRequest,
 	processor *DocumentProcessor,
 	progressChan chan response.GitHubImportProgress,
@@ -277,13 +317,14 @@ func (s *GitHubImportService) processFile(
 	uploadResult, err := global.Storage.Upload(ctx, key, strings.NewReader(string(content)), int64(len(content)), mimeType)
 	if err != nil {
 		failCount++
-		progressChan <- response.GitHubImportProgress{
+		actLogger.Warning(actlog.EventGHImportDownload, fmt.Sprintf("上传失败: %s", filePath))
+		sendProgress(progressChan, response.GitHubImportProgress{
 			Stage:    "downloading",
 			Current:  successCount + failCount,
 			Total:    total,
 			FileName: filePath,
 			Message:  fmt.Sprintf("上传失败: %s - %s", filePath, err.Error()),
-		}
+		})
 		return successCount, failCount
 	}
 
@@ -306,18 +347,19 @@ func (s *GitHubImportService) processFile(
 
 	// 同步处理文档，并推送处理状态
 	statusChan := make(chan response.ProcessStatus, 10)
-	go processor.ProcessDocumentWithCallback(doc, content, statusChan)
+	docLogger := actLogger.WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10))
+	go processor.ProcessDocumentWithCallback(doc, content, statusChan, docLogger)
 
 	// 转发处理状态到 progressChan
 	processingFailed := false
 	for status := range statusChan {
-		progressChan <- response.GitHubImportProgress{
+		sendProgress(progressChan, response.GitHubImportProgress{
 			Stage:    status.Stage,
 			Current:  successCount + failCount,
 			Total:    total,
 			FileName: filePath,
 			Message:  fmt.Sprintf("[%s] %s", filePath, status.Message),
-		}
+		})
 		if status.Stage == "completed" {
 			break
 		}

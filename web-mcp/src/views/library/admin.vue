@@ -157,7 +157,7 @@
                   <button 
                     class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-all bg-emerald-600 text-white hover:bg-emerald-700"
                     title="Add a new version"
-                    @click="showAddVersionModal = true"
+                    @click="openAddVersionModal"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                       <path d="M12 5l0 14"></path>
@@ -265,100 +265,14 @@
     </main>
 
     <!-- Add Version Modal -->
-    <div v-if="showAddVersionModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold text-stone-800">Add New Version</h2>
-          <p class="mt-1 text-sm text-stone-500">Create a new version for this library</p>
-        </div>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-stone-700 mb-2">Version Name</label>
-            <input 
-              v-model="newVersionName"
-              type="text" 
-              placeholder="e.g., 1.0.0, 1.2.3-beta, 2.0.0-rc.1"
-              class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
-            />
-            <p class="mt-1 text-xs text-stone-500">Semantic Versioning (e.g., 1.0.0, 1.2.3-beta). The 'v' prefix will be added automatically.</p>
-          </div>
-        </div>
-
-        <div class="mt-6 flex gap-3 justify-end">
-          <button 
-            class="px-4 py-2 rounded-lg border border-stone-300 text-sm font-medium text-stone-700 hover:bg-stone-50"
-            @click="showAddVersionModal = false"
-          >
-            Cancel
-          </button>
-          <button 
-            class="px-4 py-2 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-            :disabled="!newVersionName.trim()"
-            @click="handleAddVersion"
-          >
-            Create Version
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Refresh Progress Modal -->
-    <div v-if="refreshing" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold text-stone-800">Refreshing Version: {{ refreshingVersion }}</h2>
-          <p class="mt-1 text-sm text-stone-500">Reprocessing all documents in this version...</p>
-        </div>
-
-        <!-- Progress Bar -->
-        <div v-if="refreshProgress" class="mb-4">
-          <div class="flex justify-between text-sm text-stone-600 mb-1">
-            <span>{{ refreshProgress.message }}</span>
-            <span>{{ refreshProgress.current }} / {{ refreshProgress.total }}</span>
-          </div>
-          <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-            <div 
-              class="h-full bg-emerald-500 transition-all duration-300"
-              :style="{ width: `${refreshProgress.total > 0 ? (refreshProgress.current / refreshProgress.total) * 100 : 0}%` }"
-            ></div>
-          </div>
-        </div>
-
-        <!-- Document Status List -->
-        <div v-if="refreshDocStatuses.length > 0" class="max-h-48 overflow-y-auto border border-stone-200 rounded-lg">
-          <div 
-            v-for="doc in refreshDocStatuses" 
-            :key="doc.id"
-            class="flex items-center gap-2 px-3 py-2 border-b border-stone-100 last:border-b-0"
-          >
-            <!-- Status Icon -->
-            <div class="flex-shrink-0">
-              <svg v-if="doc.status === 'processing'" class="h-4 w-4 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <svg v-else-if="doc.status === 'completed'" class="h-4 w-4 text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
-              </svg>
-              <svg v-else class="h-4 w-4 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm-1.72 6.97a.75.75 0 10-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 101.06 1.06L12 13.06l1.72 1.72a.75.75 0 101.06-1.06L13.06 12l1.72-1.72a.75.75 0 10-1.06-1.06L12 10.94l-1.72-1.72z" clip-rule="evenodd" />
-              </svg>
-            </div>
-            <!-- Document Title -->
-            <span class="text-sm text-stone-700 truncate">{{ doc.title }}</span>
-          </div>
-        </div>
-
-        <!-- Loading State (before documents start) -->
-        <div v-else class="flex items-center justify-center py-8">
-          <svg class="h-8 w-8 text-emerald-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        </div>
-      </div>
-    </div>
+    <AddVersionModal
+      v-model:visible="showAddVersionModal"
+      :library-id="libraryId"
+      :library-name="library.name"
+      :source-type="library.source_type"
+      :source-url="library.source_url"
+      @success="handleVersionCreated"
+    />
 
     <!-- Footer -->
     <AppFooter />
@@ -368,12 +282,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import AddVersionModal from '@/components/AddVersionModal.vue'
 import { useUser } from '@/stores/user'
-import { getLibrary, updateLibrary, createVersion, deleteVersion, refreshVersionWithSSE, deleteLibrary, getVersions } from '@/api/library'
-import type { RefreshStatus } from '@/api/library'
+import { getLibrary, updateLibrary, deleteVersion, refreshVersion, deleteLibrary, getVersions } from '@/api/library'
 import { useRouter } from 'vue-router'
 import { getDocuments, deleteDocument, uploadDocumentWithSSE } from '@/api/document'
 import type { Library } from '@/api/library'
@@ -409,10 +323,7 @@ const uploadProgress = ref(0)
 const uploadMessage = ref('')
 
 // 刷新版本状态
-const refreshing = ref(false)
 const refreshingVersion = ref('')
-const refreshProgress = ref<RefreshStatus | null>(null)
-const refreshDocStatuses = ref<Array<{ id: number; title: string; status: 'processing' | 'completed' | 'failed' }>>([])
 
 // Configuration form
 const editForm = reactive({
@@ -431,7 +342,6 @@ interface VersionInfo {
 const versions = ref<VersionInfo[]>([])
 const loadingVersions = ref(false)
 const showAddVersionModal = ref(false)
-const newVersionName = ref('')
 const selectedVersion = ref('')
 
 // Documents
@@ -526,57 +436,73 @@ const handleFileUpload = async (event: Event) => {
     formData.append('version', selectedVersion.value)
     formData.append('file', file)
 
-    // 使用 SSE 上传
-    const eventSource = new EventSource(`/api/documents/upload-sse?library_id=${libraryId.value}&version=${selectedVersion.value}`)
-    
-    eventSource.addEventListener('parsing', (event) => {
-      const data = JSON.parse(event.data)
-      uploadProgress.value = 20
-      uploadMessage.value = 'Parsing document...'
-    })
-
-    eventSource.addEventListener('chunking', (event) => {
-      const data = JSON.parse(event.data)
-      uploadProgress.value = 50
-      uploadMessage.value = 'Chunking document...'
-    })
-
-    eventSource.addEventListener('embedding', (event) => {
-      const data = JSON.parse(event.data)
-      uploadProgress.value = 80
-      uploadMessage.value = 'Generating embeddings...'
-    })
-
-    eventSource.addEventListener('completed', (event) => {
-      const data = JSON.parse(event.data)
-      uploadProgress.value = 100
-      uploadMessage.value = 'Upload successful!'
-      console.log('✓ Upload successful')
-      eventSource.close()
-      
-      setTimeout(() => {
-        uploading.value = false
-        uploadProgress.value = 0
-        uploadMessage.value = ''
-        fetchDocuments()
-        fetchVersions()
-      }, 500)
-    })
-
-    eventSource.addEventListener('error', (event) => {
-      console.error('Upload error:', event)
-      ElMessage.error('Upload failed')
-      eventSource.close()
-      uploading.value = false
-      uploadProgress.value = 0
-      uploadMessage.value = ''
-    })
-
-    // 发送文件
+    // 使用普通上传接口（后台异步处理，通过日志查看进度）
     const response = await fetch(`/api/documents/upload?library_id=${libraryId.value}&version=${selectedVersion.value}`, {
       method: 'POST',
       body: formData
     })
+    
+    if (response.ok) {
+      ElMessage.success('上传已启动，跳转到控制台查看进度')
+      uploading.value = false
+      uploadProgress.value = 0
+      uploadMessage.value = ''
+      // 跳转到详情页的控制台 tab
+      router.push({ 
+        name: 'library-detail', 
+        params: { id: libraryId.value }, 
+        query: { tab: 'logs' } 
+      })
+    } else {
+      throw new Error('Upload failed')
+    }
+
+    // ====== 以下是 SSE 版本的代码，保留备用 ======
+    // const eventSource = new EventSource(`/api/documents/upload-sse?library_id=${libraryId.value}&version=${selectedVersion.value}`)
+    // 
+    // eventSource.addEventListener('parsing', (event) => {
+    //   const data = JSON.parse(event.data)
+    //   uploadProgress.value = 20
+    //   uploadMessage.value = 'Parsing document...'
+    // })
+    //
+    // eventSource.addEventListener('chunking', (event) => {
+    //   const data = JSON.parse(event.data)
+    //   uploadProgress.value = 50
+    //   uploadMessage.value = 'Chunking document...'
+    // })
+    //
+    // eventSource.addEventListener('embedding', (event) => {
+    //   const data = JSON.parse(event.data)
+    //   uploadProgress.value = 80
+    //   uploadMessage.value = 'Generating embeddings...'
+    // })
+    //
+    // eventSource.addEventListener('completed', (event) => {
+    //   const data = JSON.parse(event.data)
+    //   uploadProgress.value = 100
+    //   uploadMessage.value = 'Upload successful!'
+    //   console.log('✓ Upload successful')
+    //   eventSource.close()
+    //   
+    //   setTimeout(() => {
+    //     uploading.value = false
+    //     uploadProgress.value = 0
+    //     uploadMessage.value = ''
+    //     fetchDocuments()
+    //     fetchVersions()
+    //   }, 500)
+    // })
+    //
+    // eventSource.addEventListener('error', (event) => {
+    //   console.error('Upload error:', event)
+    //   ElMessage.error('Upload failed')
+    //   eventSource.close()
+    //   uploading.value = false
+    //   uploadProgress.value = 0
+    //   uploadMessage.value = ''
+    // })
+    // ====== SSE 版本代码结束 ======
   } catch (error) {
     ElMessage.error('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
     uploading.value = false
@@ -647,50 +573,36 @@ const handleReprocess = async (id: number) => {
 }
 
 const handleRefreshVersion = async (version: string) => {
-  if (!confirm(`Refresh version "${version}"? This will reprocess all documents in this version.`)) return
+  try {
+    await ElMessageBox.confirm(
+      '这将重新处理该版本下的所有文档',
+      `刷新版本 "${version}"？`,
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
   
-  // 初始化刷新状态
-  refreshing.value = true
   refreshingVersion.value = version
-  refreshProgress.value = null
-  refreshDocStatuses.value = []
   
   try {
-    await refreshVersionWithSSE(libraryId.value, version, {
-      onProgress: (status) => {
-        refreshProgress.value = status
-        
-        // 更新文档状态列表
-        if (status.doc_id && status.doc_title) {
-          const existing = refreshDocStatuses.value.find(d => d.id === status.doc_id)
-          if (existing) {
-            existing.status = status.stage === 'doc_completed' ? 'completed' 
-                            : status.stage === 'doc_failed' ? 'failed' 
-                            : 'processing'
-          } else {
-            refreshDocStatuses.value.push({
-              id: status.doc_id,
-              title: status.doc_title,
-              status: 'processing'
-            })
-          }
-        }
-      },
-      onComplete: (status) => {
-        refreshProgress.value = status
-        ElMessage.success(`Version refresh completed. ${status.total} documents processed.`)
-        refreshing.value = false
-        fetchVersions()
-      },
-      onError: (error) => {
-        console.error('Failed to refresh version:', error)
-        ElMessage.error('Refresh failed: ' + error.message)
-        refreshing.value = false
-      }
+    await refreshVersion(libraryId.value, version)
+    ElMessage.success('版本刷新已启动，跳转到控制台查看进度')
+    // 跳转到详情页的控制台 tab（包含版本信息）
+    router.push({ 
+      name: 'library-version', 
+      params: { id: libraryId.value, version: version }, 
+      query: { tab: 'logs' } 
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to refresh version:', error)
-    refreshing.value = false
+    ElMessage.error('刷新失败: ' + (error.message || '未知错误'))
+  } finally {
+    refreshingVersion.value = ''
   }
 }
 
@@ -707,28 +619,20 @@ const handleDeleteVersion = async (version: string) => {
   }
 }
 
-const handleAddVersion = async () => {
-  if (!newVersionName.value.trim()) {
-    ElMessage.warning('Please enter a version name')
-    return
-  }
+// 打开添加版本弹窗
+const openAddVersionModal = () => {
+  showAddVersionModal.value = true
+}
 
-  try {
-    // 自动添加 v 前缀
-    const versionWithPrefix = newVersionName.value.startsWith('v') 
-      ? newVersionName.value 
-      : `v${newVersionName.value}`
-    
-    const res = await createVersion(libraryId.value, versionWithPrefix)
-    // 拦截器已处理错误，这里只处理成功情况
-    console.log('✓ Version created')
-    showAddVersionModal.value = false
-    newVersionName.value = ''
-    await fetchVersions()
-  } catch (error) {
-    // 错误已由拦截器显示，这里只记录日志
-    console.error('Failed to add version:', error)
-  }
+// 处理版本创建成功
+const handleVersionCreated = async (version: string) => {
+  console.log('✓ Version created:', version)
+  // 跳转到详情页的控制台 tab 查看进度（包含版本信息）
+  router.push({ 
+    name: 'library-version', 
+    params: { id: libraryId.value, version: version }, 
+    query: { tab: 'logs' } 
+  })
 }
 
 // 切换到 documents tab 时加载文档和版本

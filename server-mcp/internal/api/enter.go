@@ -10,6 +10,7 @@ type ApiGroup struct {
 	AuthApi
 	UserApi
 	ApiKeyApi
+	ActivityLogApi
 }
 
 var ApiGroupApp = new(ApiGroup)
@@ -19,3 +20,4 @@ var documentService = service.ServiceGroupApp.DocumentService
 var searchService = service.ServiceGroupApp.SearchService
 var mcpService = service.ServiceGroupApp.MCPService
 var apiKeyService = service.ServiceGroupApp.ApiKeyService
+var activityLogService = service.ServiceGroupApp.ActivityLogService

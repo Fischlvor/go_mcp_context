@@ -9,6 +9,7 @@ type RouterGroup struct {
 	AuthRouter
 	UserRouter
 	ApiKeyRouter
+	ActivityLogRouter
 }
 
 var RouterGroupApp = new(RouterGroup)

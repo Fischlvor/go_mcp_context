@@ -211,14 +211,15 @@ func autoRefreshToken(c *gin.Context) (*api.TokenResponse, error) {
 }
 
 // GetUserUUID 从上下文获取用户 UUID
-func GetUserUUID(c *gin.Context) uuid.UUID {
-	if val, exists := c.Get("user_uuid"); exists {
-		if userUUID, ok := val.(uuid.UUID); ok {
-			return userUUID
-		}
-	}
-	return uuid.Nil
-}
+// Deprecated: 请使用 utils.GetUUID
+// func GetUserUUID(c *gin.Context) uuid.UUID {
+// 	if val, exists := c.Get("user_uuid"); exists {
+// 		if userUUID, ok := val.(uuid.UUID); ok {
+// 			return userUUID
+// 		}
+// 	}
+// 	return uuid.Nil
+// }
 
 // GetUserEmail 从上下文获取用户邮箱
 func GetUserEmail(c *gin.Context) string {
