@@ -264,9 +264,10 @@ go-mcp-context/
 │   │   ├── api/                  # API 接口
 │   │   │   ├── apikey.ts         # API Key 接口
 │   │   │   ├── document.ts       # 文档接口
-│   │   │   ├── library.ts        # 库接口
+│   │   │   ├── library.ts        # 库接口（含 GitHub 导入）
 │   │   │   └── search.ts         # 搜索接口
 │   │   ├── components/           # Vue 组件
+│   │   │   ├── AddVersionModal.vue  # 版本添加弹窗（支持 Local/GitHub）
 │   │   │   ├── AppHeader.vue     # 顶部导航
 │   │   │   ├── AppFooter.vue     # 底部栏
 │   │   │   └── PersonalDropdown.vue  # 用户下拉菜单
@@ -321,6 +322,67 @@ go-mcp-context/
 - [ ] MCP IDE 集成测试
 
 ## 📝 开发日志
+
+### 2025-12-23
+
+#### Added
+- **活动日志系统 (Activity Log)**
+  - 新增 `pkg/actlog` 包：异步批量活动日志记录
+    - `Buffer`：缓冲区实现，支持批量写入（默认 50 条/批，2 秒刷新）
+    - `TaskLogger`：任务级别日志器，预填充 libraryID、taskID、version 等公共字段
+    - 支持 `WithActor`、`WithTarget`、`WithTaskID`、`WithVersion` 等选项
+  - 新增 `ActivityLog` 数据库模型：记录库操作事件
+  - 新增 `GET /api/v1/logs` API：获取库的最新任务日志
+  - 前端 `detail.vue` 新增 Logs Tab：终端风格日志面板，支持自动轮询
+
+- **GitHub 快速导入功能**
+  - 新增 `POST /api/v1/libraries/github/init-import` API
+    - 输入 GitHub URL → 自动解析仓库 → 验证连通性 → 检查重复 → 创建库 → 异步导入
+    - 返回 `library_id` 和 `version`，前端跳转到 logs tab 查看进度
+  - 新增 `AddDocsModal.vue` 组件：支持 GitHub 和 Local 两种导入方式
+  - 新增 `pkg/utils/github.go`：`ParseGitHubURL`、`ExtractRepoName` 工具函数
+  - 新增 `pkg/utils/task_id.go`：`GenerateTaskID` 生成 ULID 格式任务 ID
+
+- **版本添加弹窗重构**
+  - 新增 `AddVersionModal.vue` 组件：统一 Local 和 GitHub 两种模式
+    - Local 模式：输入版本名创建空版本
+    - GitHub 模式：选择 tag 自动导入
+  - 版本创建成功后跳转到 logs tab 查看进度
+
+#### Changed
+- **GitHub 导入路由统一**
+  - `POST /libraries/:id/import-github` → `POST /libraries/github/import?id=xxx`
+  - `POST /libraries/:id/import-github-sse` → `POST /libraries/github/import-sse?id=xxx`
+  - 新增 `POST /libraries/github/init-import`（快速导入）
+
+- **活动日志集成**
+  - `ImportFromGitHub`：记录 `github.import.start`、`github.import.download`、`github.import.complete` 等事件
+  - `RefreshVersion`：记录 `version.refresh` 事件
+  - `InitImportFromGitHub`：记录 `library.create` 和 `github.import.start` 事件
+  - 所有日志包含 `actor_id`、`task_id`、`version`、`target_type`、`target_id` 等字段
+
+- **API 层同步写入开始日志**
+  - 在 goroutine 启动前同步写入"开始"日志，确保 API 返回前日志已入库
+  - 解决前端跳转后日志显示 `status: complete` 的问题
+
+- **前端 Tab 切换优化**
+  - `onMounted` 根据当前 tab 加载对应数据，避免不必要的请求
+  - 版本变化时只加载当前 tab 的数据
+  - 切换到 context tab 时，如果没有搜索结果则自动加载
+
+- **LibraryCreate 支持 DefaultVersion**
+  - `LibraryCreate` 请求新增 `default_version` 字段
+  - GitHub 导入时默认版本设为 `latest`
+
+#### Fixed
+- **版本重复检查**
+  - `ImportFromGitHub` API 在启动 goroutine 前检查版本是否已存在
+  - 避免重复导入同一版本
+
+- **TaskID 统一**
+  - API 层生成 taskID 并传递给服务方法，避免同一任务出现多个 taskID
+
+---
 
 ### 2025-12-21
 

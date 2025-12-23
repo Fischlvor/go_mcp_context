@@ -5,7 +5,7 @@
       :is-logged-in="isLoggedIn" 
       :user-email="userEmail" 
       :user-plan="userPlan"
-      @add-docs="showAddDialog" 
+      @add-docs="showAddDocsModal = true" 
       @sign-in="handleSignIn"
     />
     
@@ -176,6 +176,9 @@
     <!-- Footer -->
     <AppFooter />
 
+    <!-- Add Docs 弹窗（GitHub 导入） -->
+    <AddDocsModal v-model:visible="showAddDocsModal" @success="fetchLibraries" />
+
     <!-- 添加/编辑库对话框 -->
     <div v-if="dialogVisible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" @click.self="dialogVisible = false">
       <div class="w-full max-w-md rounded-xl bg-white shadow-2xl">
@@ -227,6 +230,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import AddDocsModal from '@/components/AddDocsModal.vue'
 import { useUser } from '@/stores/user'
 import { getLibraries, createLibrary, updateLibrary, deleteLibrary } from '@/api/library'
 import type { LibraryListItem } from '@/api/library'
@@ -261,6 +265,9 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const searchQuery = ref('')
+
+// Add Docs 弹窗状态
+const showAddDocsModal = ref(false)
 
 // 对话框状态
 const dialogVisible = ref(false)

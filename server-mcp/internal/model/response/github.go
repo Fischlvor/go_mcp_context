@@ -16,3 +16,9 @@ type GitHubRepoInfo struct {
 	Description   string   `json:"description"`
 	Versions      []string `json:"versions"`
 }
+
+// GitHubInitImportResponse 从 GitHub 初始化导入响应
+type GitHubInitImportResponse struct {
+	LibraryID uint   `json:"library_id"`
+	Version   string `json:"version"`
+}

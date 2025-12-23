@@ -2,10 +2,11 @@ package request
 
 // LibraryCreate 创建库请求
 type LibraryCreate struct {
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description"`
-	SourceType  string `json:"source_type"` // github, website, local（默认 local）
-	SourceURL   string `json:"source_url"`  // vuejs/docs 或 vuejs.org/guide
+	Name           string `json:"name" binding:"required"`
+	Description    string `json:"description"`
+	SourceType     string `json:"source_type"`     // github, website, local（默认 local）
+	SourceURL      string `json:"source_url"`      // vuejs/docs 或 vuejs.org/guide
+	DefaultVersion string `json:"default_version"` // 默认版本（默认 default）
 }
 
 // LibraryUpdate 更新库请求

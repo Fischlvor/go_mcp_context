@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/response"
+	"go-mcp-context/pkg/actlog"
 	"go-mcp-context/pkg/global"
 	"go-mcp-context/pkg/llm"
 
@@ -29,7 +31,7 @@ type DocumentProcessor struct{}
 
 // processDocumentCore 文档处理核心逻辑（解析、分块、Enrich、生成 Embedding）
 // 返回处理好的 chunks 和总 token 数，不写入数据库
-func (p *DocumentProcessor) processDocumentCore(doc *dbmodel.DocumentUpload, content []byte) ([]*dbmodel.DocumentChunk, int, error) {
+func (p *DocumentProcessor) processDocumentCore(doc *dbmodel.DocumentUpload, content []byte, actLogger *actlog.TaskLogger) ([]*dbmodel.DocumentChunk, int, error) {
 	// 1. 解析文档内容
 	text, err := p.parseDocument(doc.FileType, content)
 	if err != nil {
@@ -44,15 +46,18 @@ func (p *DocumentProcessor) processDocumentCore(doc *dbmodel.DocumentUpload, con
 	if len(chunks) == 0 {
 		return nil, 0, nil
 	}
+	actLogger.Info(actlog.EventDocChunk, fmt.Sprintf("分块完成: %s (%d 块)", doc.Title, len(chunks)))
 
 	// 4. LLM Enrich: 生成 Title 和 Description
 	if global.LLM != nil {
+		actLogger.Info(actlog.EventDocEnrich, fmt.Sprintf("AI 增强中: %s (%d 块)", doc.Title, len(chunks)))
 		if err := p.enrichChunks(chunks); err != nil {
 			log.Printf("[Processor] WARNING: LLM enrich failed: %v, using fallback", err)
 		}
 	}
 
 	// 5. 批量生成 Embedding
+	actLogger.Info(actlog.EventDocEmbed, fmt.Sprintf("生成 Embedding: %s (%d 块)", doc.Title, len(chunks)))
 	texts := make([]string, len(chunks))
 	for i, chunk := range chunks {
 		texts[i] = chunk.ChunkText
@@ -75,11 +80,15 @@ func (p *DocumentProcessor) processDocumentCore(doc *dbmodel.DocumentUpload, con
 	return chunks, totalTokens, nil
 }
 
-// ProcessDocument 处理文档（用于新文档上传）
-func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content []byte) error {
-	// 调用核心处理逻辑
-	chunks, totalTokens, err := p.processDocumentCore(doc, content)
+// ProcessDocument 处理文档（带任务日志器）
+// actLogger 应已设置好 document target
+func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content []byte, actLogger *actlog.TaskLogger) error {
+	actLogger.Info(actlog.EventDocParse, fmt.Sprintf("处理文档: %s", doc.Title))
+
+	// 调用核心处理逻辑（传入 logger 记录详细步骤）
+	chunks, totalTokens, err := p.processDocumentCore(doc, content, actLogger)
 	if err != nil {
+		actLogger.Error(actlog.EventDocFailed, fmt.Sprintf("处理失败: %s - %s", doc.Title, err.Error()))
 		return err
 	}
 	if len(chunks) == 0 {
@@ -88,6 +97,7 @@ func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content
 
 	// 批量插入
 	if err := global.DB.CreateInBatches(chunks, 100).Error; err != nil {
+		actLogger.Error(actlog.EventDocFailed, fmt.Sprintf("保存失败: %s - %s", doc.Title, err.Error()))
 		return fmt.Errorf("failed to save chunks: %w", err)
 	}
 
@@ -105,15 +115,17 @@ func (p *DocumentProcessor) ProcessDocument(doc *dbmodel.DocumentUpload, content
 		log.Printf("[Processor] WARNING: Failed to invalidate cache for library %d version %s: %v", doc.LibraryID, doc.Version, err)
 	}
 
+	actLogger.Info(actlog.EventDocComplete, fmt.Sprintf("处理完成: %s (%d 块, %d tokens)", doc.Title, len(chunks), totalTokens))
+
 	return nil
 }
 
 // ProcessDocumentForRefresh 处理文档用于刷新（无感知更新）
 // 返回生成的 chunks，不直接写入数据库，由调用方控制事务
 // batchVersion: 批次版本号，用于原子切换
-func (p *DocumentProcessor) ProcessDocumentForRefresh(doc *dbmodel.DocumentUpload, content []byte, batchVersion int64) ([]*dbmodel.DocumentChunk, int, error) {
-	// 调用核心处理逻辑
-	chunks, totalTokens, err := p.processDocumentCore(doc, content)
+func (p *DocumentProcessor) ProcessDocumentForRefresh(doc *dbmodel.DocumentUpload, content []byte, batchVersion int64, actLogger *actlog.TaskLogger) ([]*dbmodel.DocumentChunk, int, error) {
+	actLogger.Info(actlog.EventDocParse, fmt.Sprintf("处理文档: %s", doc.Title))
+	chunks, totalTokens, err := p.processDocumentCore(doc, content, actLogger)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -518,33 +530,36 @@ func (p *DocumentProcessor) countTokens(text string) int {
 	return len(tokens)
 }
 
-// ProcessDocumentAsync 异步处理文档
+// ProcessDocumentAsync 异步处理文档（单文档上传，无任务 ID）
 func (p *DocumentProcessor) ProcessDocumentAsync(doc *dbmodel.DocumentUpload, content []byte) {
 	go func() {
-		log.Printf("[Processor] Starting to process document: %s (ID: %d)", doc.Title, doc.ID)
-		if err := p.ProcessDocument(doc, content); err != nil {
+		// 单文档处理，无 taskID
+		docLogger := actlog.NewTaskLogger(doc.LibraryID, "", doc.Version).
+			WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10))
+
+		if err := p.ProcessDocument(doc, content, docLogger); err != nil {
 			log.Printf("[Processor] ERROR processing document %s: %v", doc.Title, err)
-			// 更新文档状态为失败
 			doc.Status = "failed"
 			doc.ErrorMessage = err.Error()
 			global.DB.Save(doc)
-		} else {
-			log.Printf("[Processor] Successfully processed document: %s", doc.Title)
 		}
 	}()
 }
 
-// ProcessDocumentWithCallback 处理文档（带状态回调）
-func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpload, content []byte, statusChan chan response.ProcessStatus) {
+// ProcessDocumentWithCallback 处理文档（带状态回调和任务日志器）
+// actLogger 应已设置好 document target
+func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpload, content []byte, statusChan chan response.ProcessStatus, actLogger *actlog.TaskLogger) {
 	defer close(statusChan)
 
 	log.Printf("[Processor] Starting to process document: %s (ID: %d)", doc.Title, doc.ID)
+	actLogger.Info(actlog.EventDocParse, fmt.Sprintf("开始处理文档: %s", doc.Title))
 
 	// 1. 解析文档
 	statusChan <- response.ProcessStatus{Stage: "parsing", Progress: 5, Message: "正在解析文档...", Status: "processing"}
 	text, err := p.parseDocument(doc.FileType, content)
 	if err != nil {
 		statusChan <- response.ProcessStatus{Stage: "failed", Progress: 0, Message: "解析失败: " + err.Error(), Status: "failed"}
+		actLogger.Error(actlog.EventDocFailed, fmt.Sprintf("解析失败: %s - %s", doc.Title, err.Error()))
 		doc.Status = "failed"
 		doc.ErrorMessage = err.Error()
 		global.DB.Save(doc)
@@ -560,15 +575,18 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 	chunks := p.chunkText(text, doc.ID, doc.LibraryID, doc.Version, doc.FilePath)
 	if len(chunks) == 0 {
 		statusChan <- response.ProcessStatus{Stage: "failed", Progress: 0, Message: "分块失败：无有效内容", Status: "failed"}
+		actLogger.Error(actlog.EventDocFailed, fmt.Sprintf("分块失败: %s - 无有效内容", doc.Title))
 		doc.Status = "failed"
 		doc.ErrorMessage = "no valid chunks"
 		global.DB.Save(doc)
 		return
 	}
+	actLogger.Info(actlog.EventDocChunk, fmt.Sprintf("分块完成: %s (%d 块)", doc.Title, len(chunks)))
 
 	// 4. LLM Enrich: 生成 Title 和 Description
 	if global.LLM != nil {
 		statusChan <- response.ProcessStatus{Stage: "enriching", Progress: 35, Message: fmt.Sprintf("正在 AI 增强（%d 块）...", len(chunks)), Status: "processing"}
+		actLogger.Info(actlog.EventDocEnrich, fmt.Sprintf("AI 增强中: %s (%d 块)", doc.Title, len(chunks)))
 		if err := p.enrichChunks(chunks); err != nil {
 			log.Printf("[Processor] WARNING: LLM enrich failed: %v, using fallback", err)
 		}
@@ -576,6 +594,7 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 
 	// 5. 生成 Embedding
 	statusChan <- response.ProcessStatus{Stage: "embedding", Progress: 60, Message: fmt.Sprintf("正在生成 Embedding（%d 块）...", len(chunks)), Status: "processing"}
+	actLogger.Info(actlog.EventDocEmbed, fmt.Sprintf("生成 Embedding: %s (%d 块)", doc.Title, len(chunks)))
 	var texts []string
 	for _, chunk := range chunks {
 		texts = append(texts, chunk.ChunkText)
@@ -584,6 +603,7 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 	embeddings, err := global.Embedding.EmbedBatch(texts)
 	if err != nil {
 		statusChan <- response.ProcessStatus{Stage: "failed", Progress: 0, Message: "Embedding 生成失败: " + err.Error(), Status: "failed"}
+		actLogger.Error(actlog.EventDocFailed, fmt.Sprintf("Embedding 失败: %s - %s", doc.Title, err.Error()))
 		doc.Status = "failed"
 		doc.ErrorMessage = err.Error()
 		global.DB.Save(doc)
@@ -627,6 +647,7 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 	}
 
 	log.Printf("[Processor] Successfully processed document: %s (chunks: %d, tokens: %d)", doc.Title, len(chunks), totalTokens)
+	actLogger.Info(actlog.EventDocComplete, fmt.Sprintf("处理完成: %s (%d 块, %d tokens)", doc.Title, len(chunks), totalTokens))
 	statusChan <- response.ProcessStatus{Stage: "completed", Progress: 100, Message: "处理完成", Status: "completed"}
 }
 
