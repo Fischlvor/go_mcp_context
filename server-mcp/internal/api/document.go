@@ -2,11 +2,13 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
 	"go-mcp-context/internal/service"
+	"go-mcp-context/pkg/actlog"
 	"go-mcp-context/pkg/global"
 
 	"github.com/gin-gonic/gin"
@@ -70,6 +72,11 @@ func (d *DocumentApi) Upload(c *gin.Context) {
 		response.FailWithMessage("上传失败: "+err.Error(), c)
 		return
 	}
+
+	// 记录活动日志
+	actlog.Info(uint(libraryID), actlog.EventDocUpload, fmt.Sprintf("上传文档: %s", header.Filename),
+		actlog.WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10)),
+		actlog.WithVersion(version))
 
 	response.OkWithDetailed(doc, "上传成功，正在处理中", c)
 }
@@ -278,6 +285,9 @@ func (d *DocumentApi) Delete(c *gin.Context) {
 		return
 	}
 
+	// 先获取文档信息（用于日志）
+	doc, _ := documentService.GetByID(uint(id))
+
 	if err := documentService.Delete(uint(id)); err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.FailWithMessage("文档不存在", c)
@@ -285,6 +295,13 @@ func (d *DocumentApi) Delete(c *gin.Context) {
 		}
 		response.FailWithMessage("删除失败", c)
 		return
+	}
+
+	// 记录活动日志
+	if doc != nil {
+		actlog.Success(doc.LibraryID, actlog.EventDocDelete, fmt.Sprintf("删除文档: %s", doc.Title),
+			actlog.WithTarget("document", strconv.FormatUint(uint64(id), 10)),
+			actlog.WithVersion(doc.Version))
 	}
 
 	response.OkWithMessage("删除成功", c)

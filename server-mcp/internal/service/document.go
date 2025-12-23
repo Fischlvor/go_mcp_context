@@ -9,12 +9,14 @@ import (
 	"mime/multipart"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
+	"go-mcp-context/pkg/actlog"
 	"go-mcp-context/pkg/global"
 
 	"gorm.io/gorm"
@@ -239,9 +241,11 @@ func (s *DocumentService) UploadWithCallback(libraryID uint, version string, fil
 		return nil, err
 	}
 
-	// 异步处理文档（带状态回调）
+	// 异步处理文档（带状态回调，单文档上传无任务 ID）
 	processor := &DocumentProcessor{}
-	go processor.ProcessDocumentWithCallback(doc, content, statusChan)
+	docLogger := actlog.NewTaskLogger(doc.LibraryID, "", doc.Version).
+		WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10))
+	go processor.ProcessDocumentWithCallback(doc, content, statusChan, docLogger)
 
 	return doc, nil
 }

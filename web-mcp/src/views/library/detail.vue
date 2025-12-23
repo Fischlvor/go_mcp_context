@@ -147,12 +147,33 @@
               </div>
               <!-- 工具栏 -->
               <div class="flex flex-wrap items-center gap-2.5 sm:gap-1.5">
-                <!-- 刷新按钮 -->
+                <!-- Terminal 按钮 -->
+                <button 
+                  :class="[
+                    'flex h-8 items-center justify-center gap-1.5 rounded-lg border text-base transition w-8',
+                    activeTab === 'logs' 
+                      ? 'border-stone-700 bg-stone-700 hover:border-stone-700' 
+                      : 'border-stone-300 text-stone-500 hover:border-stone-400'
+                  ]"
+                  @click="activeTab = activeTab === 'logs' ? 'context' : 'logs'"
+                  title="Activity Logs"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" :class="['h-5 w-5', activeTab === 'logs' ? 'text-stone-50' : 'text-stone-500']">
+                    <path d="M8 9l3 3l-3 3"></path>
+                    <path d="M13 15l3 0"></path>
+                    <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>
+                  </svg>
+                </button>
+                
+                <!-- 刷新版本按钮（重新处理文档） -->
                 <button 
                   class="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-stone-300 text-base text-stone-500 transition hover:border-stone-400 w-8"
-                  @click="handleSearch"
+                  :class="{ 'opacity-50 cursor-not-allowed': refreshingVersion }"
+                  :disabled="refreshingVersion"
+                  @click="handleRefreshVersion"
+                  title="Refresh version (reprocess all documents)"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-stone-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-stone-500" :class="{ 'animate-spin': refreshingVersion }">
                     <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path>
                     <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path>
                   </svg>
@@ -231,6 +252,37 @@
               </div>
             </div>
             <div class="border-t border-stone-300"></div>
+          </div>
+
+          <!-- Terminal 日志面板 -->
+          <div v-if="activeTab === 'logs'" class="mt-8">
+            <div class="rounded-xl bg-stone-800 p-6 shadow-sm">
+              <div class="h-[360px] overflow-y-auto font-mono text-sm text-stone-50 [scrollbar-color:theme(colors.stone.400)_theme(colors.stone.800)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-400 [&::-webkit-scrollbar-track]:bg-stone-800 [&::-webkit-scrollbar]:w-2">
+                <div v-if="activityLogs.length === 0" class="text-stone-400">
+                  No activity logs yet. Logs will appear here when you perform actions like importing documents or refreshing content.
+                </div>
+                <div 
+                  v-for="(log, index) in activityLogs" 
+                  :key="index" 
+                  class="mb-1 flex"
+                >
+                  <span class="shrink-0 pr-3 tracking-tighter text-stone-400">{{ formatLogTime(log.time) }}</span>
+                  <span :class="getLogClass(log)">{{ log.message }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 text-center">
+              <button 
+                class="group inline-flex items-center gap-1.5 text-stone-600 decoration-current underline-offset-2 transition-colors hover:text-emerald-600 hover:underline"
+                @click="fetchLogs"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="group-hover:animate-spin">
+                  <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path>
+                  <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path>
+                </svg>
+                <span class="text-sm font-medium">Refresh Logs</span>
+              </button>
+            </div>
           </div>
 
           <!-- Context Tab 内容 -->
@@ -391,7 +443,7 @@
                               <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
                               <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
                             </svg>
-                            <span class="truncate">{{ doc.title }}</span>
+                            <span class="truncate">{{ getDisplayPath(doc.file_path) }}</span>
                           </div>
                         </td>
                         <td class="h-11 whitespace-nowrap px-2 text-right align-middle text-base font-normal slashed-zero tabular-nums leading-tight text-stone-800 sm:px-4">
@@ -439,40 +491,14 @@
     <AppFooter />
 
     <!-- Add Version Modal -->
-    <div v-if="showAddVersionModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showAddVersionModal = false">
-      <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold text-stone-800">Add New Version</h2>
-          <p class="mt-1 text-sm text-stone-500">Create a new version for this library</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-stone-700">Version Name</label>
-          <input 
-            v-model="newVersionName"
-            type="text"
-            placeholder="e.g. 1.0.0 or v1.0.0"
-            class="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            @keyup.enter="handleAddVersion"
-          />
-          <p class="mt-1 text-xs text-stone-400">Version will be prefixed with 'v' if not already</p>
-        </div>
-        <div class="mt-6 flex gap-3 justify-end">
-          <button 
-            class="px-4 py-2 rounded-lg border border-stone-300 text-sm font-medium text-stone-700 hover:bg-stone-50"
-            @click="showAddVersionModal = false"
-          >
-            Cancel
-          </button>
-          <button 
-            class="px-4 py-2 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-            :disabled="!newVersionName.trim()"
-            @click="handleAddVersion"
-          >
-            Create Version
-          </button>
-        </div>
-      </div>
-    </div>
+    <AddVersionModal
+      v-model:visible="showAddVersionModal"
+      :library-id="libraryId"
+      :library-name="library.name"
+      :source-type="library.source_type"
+      :source-url="library.source_url"
+      @success="handleVersionCreated"
+    />
 
     <!-- 点击外部关闭下拉框 -->
     <div 
@@ -484,13 +510,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import AddVersionModal from '@/components/AddVersionModal.vue'
 import { useUser } from '@/stores/user'
-import { getLibrary, createVersion } from '@/api/library'
+import { getLibrary, getActivityLogs, refreshVersion } from '@/api/library'
+import type { ActivityLog } from '@/api/library'
 import { getDocuments, uploadDocumentWithSSE, getChunks } from '@/api/document'
 import type { Library } from '@/api/library'
 const route = useRoute()
@@ -519,7 +547,8 @@ const library = ref<Library>({
   updated_at: ''
 })
 
-const activeTab = ref('context')
+// 从 URL query 读取初始 tab，默认 context
+const activeTab = ref((route.query.tab as string) || 'context')
 const searchTopic = ref('')
 const searchMode = ref<'code' | 'info'>('code')
 const searching = ref(false)
@@ -542,7 +571,142 @@ const uploadMessage = ref('')
 // 版本选择
 const showVersionDropdown = ref(false)
 const showAddVersionModal = ref(false)
-const newVersionName = ref('')
+
+// 刷新版本状态
+const refreshingVersion = ref(false)
+
+// Terminal 日志
+const loadingLogs = ref(false)
+const activityLogs = ref<ActivityLog[]>([])
+const logPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+
+// 从 API 获取日志
+const fetchLogs = async () => {
+  // 防止重复请求
+  if (loadingLogs.value) return
+  
+  loadingLogs.value = true
+  try {
+    const res = await getActivityLogs(libraryId.value, 50)
+    activityLogs.value = res.logs || []
+    
+    // 如果状态是 complete，停止轮询
+    if (res.status === 'complete') {
+      stopLogPolling()
+    }
+  } catch (error) {
+    console.error('Failed to fetch logs:', error)
+  } finally {
+    loadingLogs.value = false
+  }
+}
+
+// 开始轮询日志
+const startLogPolling = () => {
+  // 先停止已有的轮询
+  stopLogPolling()
+  // 立即请求一次
+  fetchLogs()
+  // 每 2 秒轮询一次
+  logPollingTimer.value = setInterval(fetchLogs, 2000)
+}
+
+// 停止轮询日志
+const stopLogPolling = () => {
+  if (logPollingTimer.value) {
+    clearInterval(logPollingTimer.value)
+    logPollingTimer.value = null
+  }
+}
+
+// 刷新版本（重新处理所有文档）
+const handleRefreshVersion = async () => {
+  if (refreshingVersion.value) return
+  
+  const currentVersion = currentVersionDisplay.value
+  if (!currentVersion) {
+    ElMessage.warning('请先选择版本')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      '这将重新处理该版本下的所有文档',
+      `刷新版本 "${currentVersion}"？`,
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
+  
+  refreshingVersion.value = true
+  try {
+    await refreshVersion(libraryId.value, currentVersion)
+    ElMessage.success('版本刷新已启动，请查看控制台日志')
+    // 清空其他 tab 数据，刷新完成后需要重新加载
+    documents.value = []
+    searchResult.value = 'Loading document...'
+    hasSearched.value = false
+    // 切换到控制台 tab 并开始轮询
+    activeTab.value = 'logs'
+    startLogPolling()
+  } catch (error: any) {
+    ElMessage.error('刷新版本失败: ' + (error.message || '未知错误'))
+  } finally {
+    refreshingVersion.value = false
+  }
+}
+
+// 获取日志样式（只给主要事件着色）
+const getLogClass = (log: ActivityLog) => {
+  // 优先根据 status 判断
+  if (log.status === 'success') return 'text-emerald-400'  // 成功 - 绿色
+  if (log.status === 'error') return 'text-red-400'        // 错误 - 红色
+  if (log.status === 'warning') return 'text-yellow-400'   // 警告 - 黄色
+  
+  // 根据 event 类型设置颜色（主要事件）
+  const event = log.event || ''
+  
+  if (event === 'github.import.start') return 'text-purple-400'    // GitHub 导入开始 - 紫色
+  if (event === 'version.refresh') return 'text-sky-400'           // 版本刷新 - 蓝色
+  //if (event === 'document.parse') return 'text-cyan-400'           // 解析 - 青色
+  if (event === 'document.enrich') return 'text-amber-400'         // AI增强 - 琥珀色
+  if (event === 'document.embed') return 'text-indigo-400'         // Embedding - 靛蓝色
+  
+  // 其他默认白色
+  return 'text-stone-300'
+}
+
+// 获取文档显示路径（去掉 lib 和 version 前缀）
+// 例如：mcp/docs/gin/v1.6.3/README.md -> README.md
+// 例如：mcp/docs/gin/v1.6.3/examples/README.md -> examples/README.md
+const getDisplayPath = (filePath: string) => {
+  if (!filePath) return ''
+  const parts = filePath.split('/')
+  // 路径格式: mcp/docs/{lib}/{version}/{relative_path...}
+  // 跳过前 4 段，返回剩余部分
+  if (parts.length > 4) {
+    return parts.slice(4).join('/')
+  }
+  // 如果路径格式不符合预期，返回文件名
+  return parts[parts.length - 1]
+}
+
+// 格式化日志时间
+const formatLogTime = (isoTime: string) => {
+  const date = new Date(isoTime)
+  return date.toLocaleString('zh-CN', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
 
 // 当前版本显示
 const currentVersionDisplay = computed(() => {
@@ -590,30 +754,17 @@ const openAddVersionModal = () => {
   showAddVersionModal.value = true
 }
 
-// 创建新版本
-const handleAddVersion = async () => {
-  if (!newVersionName.value.trim()) {
-    ElMessage.warning('Please enter a version name')
-    return
-  }
-
-  // 自动添加 v 前缀
-  let versionWithPrefix = newVersionName.value.trim()
-  if (!versionWithPrefix.startsWith('v')) {
-    versionWithPrefix = 'v' + versionWithPrefix
-  }
-
-  try {
-    await createVersion(libraryId.value, versionWithPrefix)
-    showAddVersionModal.value = false
-    newVersionName.value = ''
-    // 刷新库信息以获取新版本列表
-    await fetchLibrary()
-    // 跳转到新版本
-    router.push(`/libraries/${libraryId.value}/${versionWithPrefix}`)
-  } catch (error) {
-    console.error('Failed to create version:', error)
-  }
+// 处理版本创建成功
+const handleVersionCreated = async (newVersion: string) => {
+  console.log('✓ Version created:', newVersion)
+  // 清空旧版本数据，确保新版本重新加载
+  documents.value = []
+  searchResult.value = ''
+  hasSearched.value = false
+  // 刷新库信息以获取新版本列表
+  await fetchLibrary()
+  // 跳转到新版本的 logs tab
+  router.push(`/libraries/${libraryId.value}/${newVersion}?tab=logs`)
 }
 
 const handleSignIn = () => {
@@ -727,11 +878,13 @@ const handleSearch = async () => {
   searching.value = true
   hasSearched.value = true
   
+  const topic = searchTopic.value.trim()
+  
   try {
     // 调用统一的 getChunks API，通过 topic 参数控制是否搜索
     const res = await getChunks(searchMode.value, libraryId.value, {
       version: version.value, // 传入版本参数
-      topic: searchTopic.value.trim() || undefined // 空字符串转为 undefined，返回全部文档
+      topic: topic || undefined // 空字符串转为 undefined，返回全部文档
     })
     
     const chunks = (res.chunks || []) as any[]
@@ -758,8 +911,8 @@ const handleSearch = async () => {
       }).join('\n\n--------------------------------\n\n')
       searchResult.value = formatted
     } else {
-      if (searchTopic.value.trim()) {
-        searchResult.value = `No results found for "${searchTopic.value}".`
+      if (topic) {
+        searchResult.value = `No results found for "${topic}".`
       } else {
         searchResult.value = 'No documents found.'
       }
@@ -834,26 +987,77 @@ const getTruncatedText = (text: string | undefined) => {
 onMounted(async () => {
   initUserState()
   await fetchLibrary()
-  handleSearch()
+  
+  // 根据当前 tab 加载对应数据
+  if (activeTab.value === 'context') {
+    handleSearch()
+  } else if (activeTab.value === 'documents') {
+    fetchDocumentsList()
+  } else if (activeTab.value === 'logs') {
+    startLogPolling()
+  }
 })
 
-// 监听 activeTab 变化，切换到 documents 时加载文档列表
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  stopLogPolling()
+})
+
+// 监听 activeTab 变化
 watch(activeTab, (newTab) => {
+  // 更新 URL query 参数（不刷新页面）
+  router.replace({ query: { ...route.query, tab: newTab } })
+  
+  // 切换到 context 时，如果没有搜索结果则加载
+  if (newTab === 'context' && !hasSearched.value) {
+    handleSearch()
+  }
+  // 切换到 documents 时加载文档列表
   if (newTab === 'documents' && documents.value.length === 0) {
     fetchDocumentsList()
   }
+  // 切换到 terminal 时开始轮询日志
+  if (newTab === 'logs') {
+    startLogPolling()
+  } else {
+    // 离开 terminal 时停止轮询
+    stopLogPolling()
+  }
 })
 
-// 监听版本和 searchMode 变化，统一调用 handleSearch
-// handleSearch 会根据 searchTopic 是否有值决定是搜索还是获取全部文档
+// 监听 URL query.tab 变化（路由跳转时更新 activeTab）
 watch(
-  [() => route.params.version, searchMode],
-  () => {
-    handleSearch()
-    // 如果在 documents tab，也重新加载文档列表
-    if (activeTab.value === 'documents') {
-      fetchDocumentsList()
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && newTab !== activeTab.value) {
+      activeTab.value = newTab as string
     }
   }
 )
+
+// 监听版本变化，刷新所有 tab 的数据
+watch(
+  () => route.params.version,
+  () => {
+    // 版本切换时，清空并重新加载各 tab 数据
+    // 清空 documents 数据，强制下次切换时重新加载
+    documents.value = []
+    // 清空 context 搜索结果
+    searchResult.value = 'Loading document...'
+    hasSearched.value = false
+    // 根据当前 tab 加载对应数据
+    if (activeTab.value === 'context') {
+      handleSearch()
+    } else if (activeTab.value === 'documents') {
+      fetchDocumentsList()
+    } else if (activeTab.value === 'logs') {
+      fetchLogs()
+    }
+  }
+)
+
+// 监听 searchMode 变化，重新搜索
+watch(searchMode, () => {
+  handleSearch()
+})
 </script>
