@@ -63,7 +63,7 @@ export interface ActivityLog {
 }
 
 // 获取库列表
-export const getLibraries = (params?: { name?: string; page?: number; page_size?: number }): Promise<LibraryListResponse> => {
+export const getLibraries = (params?: { name?: string; page?: number; page_size?: number; sort?: string }): Promise<LibraryListResponse> => {
   return service({
     url: '/libraries',
     method: 'get',
@@ -297,3 +297,21 @@ export const initImportFromGitHub = (githubUrl: string): Promise<GitHubInitImpor
 //   )
 // }
 // ====== SSE 版本代码结束 ======
+
+// ====== 统计接口 ======
+
+// 用户统计数据
+export interface UserStats {
+  libraries: number
+  documents: number
+  tokens: number
+  mcp_calls: number
+}
+
+// 获取当前用户统计
+export const getMyStats = (): Promise<UserStats> => {
+  return service({
+    url: '/stats/my',
+    method: 'get'
+  })
+}

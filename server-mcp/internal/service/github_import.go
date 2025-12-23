@@ -11,7 +11,7 @@ import (
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
-	"go-mcp-context/pkg/actlog"
+	"go-mcp-context/pkg/bufferedwriter/actlog"
 	"go-mcp-context/pkg/github"
 	"go-mcp-context/pkg/global"
 	"go-mcp-context/pkg/utils"

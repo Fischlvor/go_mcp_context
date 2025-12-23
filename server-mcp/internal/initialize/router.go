@@ -67,6 +67,7 @@ func InitRouter() *gin.Engine {
 		routerGroup.InitLibraryRouter(v1Private)  // POST/PUT/DELETE 库
 		routerGroup.InitDocumentRouter(v1Private) // POST/DELETE 文档
 		routerGroup.InitApiKeyRouter(v1Private)   // API Key 管理（CRUD）
+		routerGroup.InitStatsRouter(v1Private)    // 统计接口
 	}
 
 	// MCP routes（需要 API Key 认证）- IDE 调用
