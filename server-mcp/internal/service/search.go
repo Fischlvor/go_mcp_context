@@ -111,6 +111,7 @@ func (s *SearchService) SearchDocuments(req *request.Search) (*response.SearchRe
 	}
 
 	results := make([]response.SearchResultItem, 0, end-start)
+	chunkIDs := make([]uint, 0, end-start)
 	for _, c := range candidates[start:end] {
 		results = append(results, response.SearchResultItem{
 			ChunkID:     c.Chunk.ID,
@@ -126,6 +127,16 @@ func (s *SearchService) SearchDocuments(req *request.Search) (*response.SearchRe
 			Tokens:      c.Chunk.Tokens,
 			Relevance:   c.FinalScore,
 		})
+		chunkIDs = append(chunkIDs, c.Chunk.ID)
+	}
+
+	// 异步更新 access_count
+	if len(chunkIDs) > 0 {
+		go func(ids []uint) {
+			global.DB.Table("document_chunks").
+				Where("id IN ?", ids).
+				UpdateColumn("access_count", global.DB.Raw("access_count + 1"))
+		}(chunkIDs)
 	}
 
 	return &response.SearchResult{

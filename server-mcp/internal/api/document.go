@@ -8,7 +8,7 @@ import (
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
 	"go-mcp-context/internal/service"
-	"go-mcp-context/pkg/actlog"
+	"go-mcp-context/pkg/bufferedwriter/actlog"
 	"go-mcp-context/pkg/global"
 
 	"github.com/gin-gonic/gin"

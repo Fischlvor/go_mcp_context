@@ -13,7 +13,7 @@ import (
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
-	"go-mcp-context/pkg/actlog"
+	"go-mcp-context/pkg/bufferedwriter/actlog"
 	"go-mcp-context/pkg/global"
 	"go-mcp-context/pkg/utils"
 
@@ -114,6 +114,7 @@ func (s *LibraryService) Create(req *request.LibraryCreate) (*dbmodel.Library, e
 		Status:         "active",
 		DefaultVersion: defaultVersion,
 		Versions:       []string{}, // versions 只存正常版本，不包含 default
+		CreatedBy:      req.CreatedBy,
 	}
 
 	if err := global.DB.Create(library).Error; err != nil {
@@ -144,7 +145,7 @@ func (s *LibraryService) getBySourceURL(sourceURL string) (*dbmodel.Library, err
 // InitFromGitHub 从 GitHub URL 初始化创建库
 // 流程：解析 URL -> 验证连通性 -> 检查重复 -> 创建库
 // 返回：库信息、仓库默认分支、错误
-func (s *LibraryService) InitFromGitHub(ctx context.Context, githubURL string) (*dbmodel.Library, string, error) {
+func (s *LibraryService) InitFromGitHub(ctx context.Context, githubURL string, createdBy string) (*dbmodel.Library, string, error) {
 	// 1. 解析 GitHub URL
 	repo, err := utils.ParseGitHubURL(githubURL)
 	if err != nil {
@@ -172,6 +173,7 @@ func (s *LibraryService) InitFromGitHub(ctx context.Context, githubURL string) (
 		SourceType:     "github",
 		SourceURL:      repo,
 		DefaultVersion: "latest",
+		CreatedBy:      createdBy,
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("创建库失败: %w", err)
@@ -325,7 +327,17 @@ func (s *LibraryService) ListWithStats(req *request.LibraryList) (*response.Page
 	}
 
 	offset := (page - 1) * pageSize
-	if err := db.Order("updated_at DESC").Offset(offset).Limit(pageSize).Find(&libraries).Error; err != nil {
+
+	// 排序
+	sort := "updated_at DESC" // 默认按更新时间
+	if req.Sort != nil && *req.Sort == "popular" {
+		// 按 MCP 调用次数排序（LEFT JOIN statistics）
+		db = db.Select("libraries.*, COALESCE(s.metric_value, 0) as popularity").
+			Joins("LEFT JOIN statistics s ON s.library_id = libraries.id AND s.metric_name = ?", dbmodel.MetricMCPGetLibraryDocs)
+		sort = "popularity DESC, updated_at DESC"
+	}
+
+	if err := db.Order(sort).Offset(offset).Limit(pageSize).Find(&libraries).Error; err != nil {
 		return nil, err
 	}
 
