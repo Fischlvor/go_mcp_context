@@ -7,6 +7,7 @@ import (
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
+	"go-mcp-context/pkg/bufferedwriter/stats"
 	"go-mcp-context/pkg/global"
 
 	"github.com/agnivade/levenshtein"
@@ -78,6 +79,9 @@ func (s *MCPService) SearchLibraries(req *request.MCPSearchLibraries) (*response
 		})
 	}
 
+	// 统计 MCP 调用（全局统计，不关联具体库）
+	stats.Increment(dbmodel.MetricMCPSearchLibraries, 1)
+
 	return result, nil
 }
 
@@ -120,6 +124,7 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 			LibraryID: library.ID,
 			Query:     req.Topic,
 			Mode:      req.Mode,
+			Version:   version,
 			Page:      page,
 			Limit:     limit,
 		})
@@ -138,6 +143,9 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 			})
 		}
 
+		// 统计 MCP 调用
+		stats.IncrementWithLibrary(library.ID, dbmodel.MetricMCPGetLibraryDocs, 1)
+
 		return &response.MCPGetLibraryDocsResult{
 			Documents: documents,
 			Page:      page,
@@ -147,7 +155,7 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 
 	// 没有 topic，返回库的所有文档块（按热度排序）
 	documentService := &DocumentService{}
-	chunks, total, err := documentService.GetChunksByLibrary(library.ID, req.Mode, page, limit)
+	chunks, total, err := documentService.GetChunksByLibrary(library.ID, req.Mode, version, page, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +170,9 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 			Relevance: 1.0, // 无搜索时默认分数
 		})
 	}
+
+	// 统计 MCP 调用
+	stats.IncrementWithLibrary(library.ID, dbmodel.MetricMCPGetLibraryDocs, 1)
 
 	return &response.MCPGetLibraryDocsResult{
 		Documents: documents,

@@ -16,12 +16,6 @@ func NewDBWriter(db *gorm.DB) *DBWriter {
 	return &DBWriter{db: db}
 }
 
-// Write 写入单条日志
-func (w *DBWriter) Write(entry *LogEntry) error {
-	log := w.toDBModel(entry)
-	return w.db.Create(log).Error
-}
-
 // WriteBatch 批量写入日志
 func (w *DBWriter) WriteBatch(entries []*LogEntry) error {
 	if len(entries) == 0 {

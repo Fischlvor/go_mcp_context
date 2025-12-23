@@ -18,6 +18,7 @@ type Library struct {
 	SourceURL      string         `json:"source_url" gorm:"size:500"`                 // vuejs/docs 或 vuejs.org/guide
 	EmbeddingModel string         `json:"embedding_model" gorm:"size:100;default:'text-embedding-3-small'"`
 	Status         string         `json:"status" gorm:"size:20;default:'active'"` // active, archived, deleted
+	CreatedBy      string         `json:"created_by" gorm:"size:36;index"`        // 创建者 UUID，空值表示公共库
 	// 关联
 	Uploads []DocumentUpload `json:"uploads,omitempty" gorm:"foreignKey:LibraryID"`
 	Chunks  []DocumentChunk  `json:"chunks,omitempty" gorm:"foreignKey:LibraryID"`

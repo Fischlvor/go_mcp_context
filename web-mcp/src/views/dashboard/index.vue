@@ -440,6 +440,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import AddDocsModal from '@/components/AddDocsModal.vue'
 import { useUser } from '@/stores/user'
 import { getAPIKeys, createAPIKey, deleteAPIKey, type APIKey, type APIKeyCreateResponse } from '@/api/apikey'
+import { getMyStats } from '@/api/library'
 
 // 用户状态
 const { isLoggedIn, userEmail, userPlan, initUserState } = useUser()
@@ -496,10 +497,29 @@ const handleDeleteKey = async (id: number) => {
 }
 
 // 复制新创建的 Key
-const copyNewKey = () => {
-  if (newlyCreatedKey.value) {
-    navigator.clipboard.writeText(newlyCreatedKey.value.api_key)
+const copyNewKey = async () => {
+  if (!newlyCreatedKey.value) return
+  
+  const text = newlyCreatedKey.value.api_key
+  try {
+    // 优先使用 Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // Fallback: 使用 execCommand（兼容 HTTP 环境）
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
     ElMessage.success('已复制到剪贴板')
+  } catch (err) {
+    console.error('复制失败:', err)
+    ElMessage.error('复制失败，请手动复制')
   }
 }
 
@@ -529,10 +549,12 @@ const formatTime = (time: string | null) => {
   return new Date(time).toLocaleString('zh-CN')
 }
 
-onMounted(() => {
-  initUserState()
-  loadAPIKeys()
-})
+// 格式化数字（如 1.5M）
+const formatNumber = (num: number): string => {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
+  return num.toString()
+}
 
 // Tabs
 const tabs = [
@@ -544,12 +566,35 @@ const tabs = [
 const activeTab = ref('overview')
 
 // Stats
-const stats = [
-  { label: 'Search Requests', value: '0' },
-  { label: 'Docs Requests', value: '0' },
-  { label: 'Parsing Tokens', value: '0' },
-  { label: 'Monthly Cost', value: 'N/A' }
-]
+const stats = ref([
+  { label: 'Libraries', value: '0' },
+  { label: 'Documents', value: '0' },
+  { label: 'Tokens', value: '0' },
+  { label: 'MCP Calls', value: '0' }
+])
+
+// 加载统计数据
+const loadStats = async () => {
+  try {
+    const res = await getMyStats()
+    if (res) {
+      stats.value = [
+        { label: 'Libraries', value: res.libraries.toString() },
+        { label: 'Documents', value: res.documents.toString() },
+        { label: 'Tokens', value: formatNumber(res.tokens) },
+        { label: 'MCP Calls', value: res.mcp_calls.toString() }
+      ]
+    }
+  } catch (e) {
+    console.error('Failed to load stats:', e)
+  }
+}
+
+onMounted(() => {
+  initUserState()
+  loadAPIKeys()
+  loadStats()
+})
 
 // IDE Icons (简化版)
 const CursorIcon = {
@@ -614,12 +659,28 @@ const apiResponse = computed(() => {
 }`
 })
 
-// Copy functions
-const copyToClipboard = (text: string) => {
-  navigator.clipboard.writeText(text)
+// Copy functions（兼容 HTTP 环境）
+const copyToClipboard = async (text: string) => {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    ElMessage.success('已复制')
+  } catch (err) {
+    console.error('复制失败:', err)
+  }
 }
 
 const copyCode = () => {
-  navigator.clipboard.writeText(mcpConfig.value)
+  copyToClipboard(mcpConfig.value)
 }
 </script>

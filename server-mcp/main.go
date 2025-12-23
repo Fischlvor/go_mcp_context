@@ -6,7 +6,8 @@ import (
 
 	"go-mcp-context/internal/initialize"
 	"go-mcp-context/internal/middleware"
-	"go-mcp-context/pkg/actlog"
+	"go-mcp-context/pkg/bufferedwriter/actlog"
+	"go-mcp-context/pkg/bufferedwriter/stats"
 	"go-mcp-context/pkg/core"
 	"go-mcp-context/pkg/global"
 	"go-mcp-context/scripts/flag"
@@ -34,6 +35,9 @@ func main() {
 	global.DB = initialize.InitGorm()
 	actlog.Init(global.DB) // 初始化活动日志（需要在 DB 之后）
 	defer actlog.Close()   // 关闭时刷新日志缓冲区
+
+	stats.Init()           // 初始化统计系统
+	defer stats.Shutdown() // 关闭时刷新统计缓冲区
 
 	global.Redis = initialize.ConnectRedis()
 	global.Cache = initialize.InitCache() // 初始化通用缓存服务

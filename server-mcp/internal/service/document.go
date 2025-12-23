@@ -16,7 +16,7 @@ import (
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
-	"go-mcp-context/pkg/actlog"
+	"go-mcp-context/pkg/bufferedwriter/actlog"
 	"go-mcp-context/pkg/global"
 
 	"gorm.io/gorm"
@@ -365,12 +365,16 @@ func getFileType(ext string) string {
 }
 
 // GetChunksByLibrary 获取库的文档块（按热度排序）
-func (s *DocumentService) GetChunksByLibrary(libraryID uint, mode string, page, limit int) ([]dbmodel.DocumentChunk, int64, error) {
+func (s *DocumentService) GetChunksByLibrary(libraryID uint, mode, version string, page, limit int) ([]dbmodel.DocumentChunk, int64, error) {
 	var chunks []dbmodel.DocumentChunk
 	var total int64
 
 	query := global.DB.Model(&dbmodel.DocumentChunk{}).
 		Where("library_id = ? AND status = ?", libraryID, "active")
+
+	if version != "" {
+		query = query.Where("version = ?", version)
+	}
 
 	if mode != "" {
 		query = query.Where("chunk_type = ?", mode)
