@@ -397,17 +397,14 @@
                   </label>
                 </div>
 
-                <!-- 上传进度条 -->
+                <!-- 上传中提示（普通接口无进度，SSE 版本有进度条） -->
                 <div v-if="uploading" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-emerald-800">{{ uploadMessage }}</span>
-                    <span class="text-sm font-medium text-emerald-800">{{ uploadProgress }}%</span>
-                  </div>
-                  <div class="h-2 w-full overflow-hidden rounded-full bg-emerald-200">
-                    <div 
-                      class="h-full rounded-full bg-emerald-600 transition-all duration-300"
-                      :style="{ width: uploadProgress + '%' }"
-                    ></div>
+                  <div class="flex items-center gap-2">
+                    <svg class="animate-spin h-5 w-5 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-emerald-800">上传中...</span>
                   </div>
                 </div>
 
@@ -519,7 +516,7 @@ import AddVersionModal from '@/components/AddVersionModal.vue'
 import { useUser } from '@/stores/user'
 import { getLibrary, getActivityLogs, refreshVersion } from '@/api/library'
 import type { ActivityLog } from '@/api/library'
-import { getDocuments, uploadDocumentWithSSE, getChunks } from '@/api/document'
+import { getDocuments, getChunks, uploadDocument } from '@/api/document'
 import type { Library } from '@/api/library'
 const route = useRoute()
 const router = useRouter()
@@ -661,23 +658,22 @@ const handleRefreshVersion = async () => {
   }
 }
 
-// 获取日志样式（只给主要事件着色）
+// 获取日志样式（优先根据 status 渲染，info 再根据 event 渲染）
 const getLogClass = (log: ActivityLog) => {
   // 优先根据 status 判断
+  if (log.status === 'start') return 'text-purple-400'     // 开始 - 紫色
   if (log.status === 'success') return 'text-emerald-400'  // 成功 - 绿色
   if (log.status === 'error') return 'text-red-400'        // 错误 - 红色
   if (log.status === 'warning') return 'text-yellow-400'   // 警告 - 黄色
   
-  // 根据 event 类型设置颜色（主要事件）
+  // status === 'info' 时，根据 event 类型设置颜色
   const event = log.event || ''
   
-  if (event === 'github.import.start') return 'text-purple-400'    // GitHub 导入开始 - 紫色
-  if (event === 'version.refresh') return 'text-sky-400'           // 版本刷新 - 蓝色
-  //if (event === 'document.parse') return 'text-cyan-400'           // 解析 - 青色
   if (event === 'document.enrich') return 'text-amber-400'         // AI增强 - 琥珀色
   if (event === 'document.embed') return 'text-indigo-400'         // Embedding - 靛蓝色
+  if (event === 'version.refresh') return 'text-sky-400'           // 版本刷新 - 蓝色
   
-  // 其他默认白色
+  // 其他 info 默认白色
   return 'text-stone-300'
 }
 
@@ -793,7 +789,7 @@ const fetchDocumentsList = async () => {
   }
 }
 
-// 上传文档
+// 上传文档（普通接口，后台异步处理，通过日志查看进度）
 const handleFileUpload = async (event: Event) => {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -809,61 +805,67 @@ const handleFileUpload = async (event: Event) => {
   // 使用当前版本或默认版本
   const uploadVersion = version.value || library.value.default_version || 'default'
 
-  // 重置状态
+  // 显示上传中状态（不显示进度条）
   uploading.value = true
-  uploadProgress.value = 0
-  uploadMessage.value = 'Uploading...'
 
   try {
-    await uploadDocumentWithSSE(
-      libraryId.value,
-      file,
-      {
-        onProgress: (status) => {
-          const progressMap: Record<string, number> = {
-            uploaded: 10,
-            parsing: 30,
-            chunking: 50,
-            embedding: 70,
-            saving: 90
-          }
-          uploadProgress.value = progressMap[status.stage] || status.progress || 0
-          uploadMessage.value = status.message || status.stage
-        },
-        onComplete: () => {
-          uploadProgress.value = 100
-          uploadMessage.value = 'Upload successful!'
-          setTimeout(() => {
-            uploading.value = false
-            uploadProgress.value = 0
-            uploadMessage.value = ''
-            fetchDocumentsList()
-            fetchLibrary()
-          }, 500)
-        },
-        onError: (error) => {
-          const errorMsg = error.message || 'Unknown error'
-          const status = (error as any).status
-          const code = (error as any).code
-          
-          // 区分错误类型
-          let displayMsg = errorMsg
-          if (status) {
-            // HTTP 错误
-            displayMsg = `HTTP Error: ${displayMsg}`
-          } else if (code !== undefined) {
-            // 业务错误
-            displayMsg = `Error (${code}): ${displayMsg}`
-          }
-          
-          ElMessage.error('Upload failed: ' + displayMsg)
-          uploading.value = false
-          uploadProgress.value = 0
-          uploadMessage.value = ''
-        }
-      },
-      uploadVersion
-    )
+    // 使用统一的 API 接口上传（后台异步处理，通过日志查看进度）
+    await uploadDocument(libraryId.value, file, uploadVersion)
+    
+    uploading.value = false
+    ElMessage.success('上传已启动，跳转到控制台查看进度')
+    // 跳转到 logs tab
+    activeTab.value = 'logs'
+    startLogPolling()
+
+    // ====== 以下是 SSE 版本的代码，保留备用 ======
+    // await uploadDocumentWithSSE(
+    //   libraryId.value,
+    //   file,
+    //   {
+    //     onProgress: (status) => {
+    //       const progressMap: Record<string, number> = {
+    //         uploaded: 10,
+    //         parsing: 30,
+    //         chunking: 50,
+    //         embedding: 70,
+    //         saving: 90
+    //       }
+    //       uploadProgress.value = progressMap[status.stage] || status.progress || 0
+    //       uploadMessage.value = status.message || status.stage
+    //     },
+    //     onComplete: () => {
+    //       uploadProgress.value = 100
+    //       uploadMessage.value = 'Upload successful!'
+    //       setTimeout(() => {
+    //         uploading.value = false
+    //         uploadProgress.value = 0
+    //         uploadMessage.value = ''
+    //         fetchDocumentsList()
+    //         fetchLibrary()
+    //       }, 500)
+    //     },
+    //     onError: (error) => {
+    //       const errorMsg = error.message || 'Unknown error'
+    //       const status = (error as any).status
+    //       const code = (error as any).code
+    //       
+    //       let displayMsg = errorMsg
+    //       if (status) {
+    //         displayMsg = `HTTP Error: ${displayMsg}`
+    //       } else if (code !== undefined) {
+    //         displayMsg = `Error (${code}): ${displayMsg}`
+    //       }
+    //       
+    //       ElMessage.error('Upload failed: ' + displayMsg)
+    //       uploading.value = false
+    //       uploadProgress.value = 0
+    //       uploadMessage.value = ''
+    //     }
+    //   },
+    //   uploadVersion
+    // )
+    // ====== SSE 版本代码结束 ======
   } catch (error) {
     ElMessage.error('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
     uploading.value = false

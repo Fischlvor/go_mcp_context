@@ -1,6 +1,7 @@
 import service from '@/utils/request'
 import type { ApiResponse } from '@/utils/request'
-import { uploadWithSSE, type SSEEvent } from '@/utils/sse'
+// SSE 相关导入（已改用普通接口，通过日志查看进度）
+// import { uploadWithSSE, type SSEEvent } from '@/utils/sse'
 
 // ============================================================
 // 类型定义
@@ -187,44 +188,46 @@ export const uploadDocument = (libraryId: number, file: File, version: string = 
   })
 }
 
+// ====== 以下是 SSE 版本的函数，保留备用 ======
 // 上传文档（SSE 实时状态）
-export const uploadDocumentWithSSE = (
-  libraryId: number,
-  file: File,
-  callbacks: {
-    onProgress?: (status: ProcessStatus) => void
-    onComplete?: (status: ProcessStatus) => void
-    onError?: (error: Error) => void
-  },
-  version: string = 'latest'
-): Promise<void> => {
-  return uploadWithSSE(
-    '/documents/upload-sse',
-    file,
-    { library_id: String(libraryId), version },
-    {
-      onMessage: (event: SSEEvent<ProcessStatus>) => {
-        console.log('[SSE] Received event:', event)
-        const stage = event.data.stage || event.type
-        
-        if (stage === 'completed') {
-          callbacks.onComplete?.(event.data)
-        } else if (stage === 'failed' || stage === 'error') {
-          callbacks.onError?.(new Error(event.data.message || 'Processing failed'))
-        } else {
-          callbacks.onProgress?.({
-            ...event.data,
-            stage: stage as ProcessStatus['stage'],
-            progress: event.data.progress || 0,
-            message: event.data.message || stage,
-            status: event.data.status || 'processing'
-          })
-        }
-      },
-      onError: callbacks.onError,
-    }
-  )
-}
+// export const uploadDocumentWithSSE = (
+//   libraryId: number,
+//   file: File,
+//   callbacks: {
+//     onProgress?: (status: ProcessStatus) => void
+//     onComplete?: (status: ProcessStatus) => void
+//     onError?: (error: Error) => void
+//   },
+//   version: string = 'latest'
+// ): Promise<void> => {
+//   return uploadWithSSE(
+//     '/documents/upload-sse',
+//     file,
+//     { library_id: String(libraryId), version },
+//     {
+//       onMessage: (event: SSEEvent<ProcessStatus>) => {
+//         console.log('[SSE] Received event:', event)
+//         const stage = event.data.stage || event.type
+//         
+//         if (stage === 'completed') {
+//           callbacks.onComplete?.(event.data)
+//         } else if (stage === 'failed' || stage === 'error') {
+//           callbacks.onError?.(new Error(event.data.message || 'Processing failed'))
+//         } else {
+//           callbacks.onProgress?.({
+//             ...event.data,
+//             stage: stage as ProcessStatus['stage'],
+//             progress: event.data.progress || 0,
+//             message: event.data.message || stage,
+//             status: event.data.status || 'processing'
+//           })
+//         }
+//       },
+//       onError: callbacks.onError,
+//     }
+//   )
+// }
+// ====== SSE 版本代码结束 ======
 
 // 删除文档
 export const deleteDocument = (id: number): Promise<ApiResponse<null>> => {

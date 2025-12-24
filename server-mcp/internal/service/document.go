@@ -79,7 +79,8 @@ func (s *DocumentService) List(req *request.DocumentList) (*response.PageResult,
 }
 
 // Upload 上传文档
-func (s *DocumentService) Upload(libraryID uint, version string, file multipart.File, header *multipart.FileHeader) (*dbmodel.DocumentUpload, error) {
+// actorID: 操作用户 UUID，taskID: 任务 ID（用于日志关联）
+func (s *DocumentService) Upload(libraryID uint, version string, file multipart.File, header *multipart.FileHeader, actorID, taskID string) (*dbmodel.DocumentUpload, error) {
 	// 检查库是否存在
 	var library dbmodel.Library
 	if err := global.DB.First(&library, libraryID).Error; err != nil {
@@ -153,9 +154,15 @@ func (s *DocumentService) Upload(libraryID uint, version string, file multipart.
 		return nil, err
 	}
 
+	// 创建任务日志器并同步记录开始日志（确保返回前写入数据库）
+	docLogger := actlog.NewTaskLogger(doc.LibraryID, taskID, doc.Version).
+		WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10)).
+		WithActor(actorID)
+	docLogger.InfoStartSync(actlog.EventDocUpload, fmt.Sprintf("上传文档: %s", header.Filename))
+
 	// 异步处理文档（解析、分块、生成 Embedding）
 	processor := &DocumentProcessor{}
-	processor.ProcessDocumentAsync(doc, content)
+	processor.ProcessDocumentAsync(doc, content, docLogger)
 
 	return doc, nil
 }

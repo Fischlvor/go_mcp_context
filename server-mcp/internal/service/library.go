@@ -613,18 +613,7 @@ func (s *LibraryService) RefreshVersion(libraryID uint, version string, actorID 
 		WithActor(actorID)
 
 	// 同步写入"开始"日志（确保 API 返回前日志已入库）
-	startLog := &dbmodel.ActivityLog{
-		LibraryID:  libraryID,
-		ActorID:    actorID,
-		TaskID:     taskID,
-		Event:      actlog.EventVerRefresh,
-		Status:     actlog.StatusInfo,
-		Message:    fmt.Sprintf("开始刷新版本: %s (%d 个文档)", version, len(documents)),
-		Version:    version,
-		TargetType: "version",
-		TargetID:   version,
-	}
-	global.DB.Create(startLog)
+	actLogger.InfoStartSync(actlog.EventVerRefresh, fmt.Sprintf("开始刷新版本: %s (%d 个文档)", version, len(documents)))
 
 	// 开始事务
 	tx := global.DB.Begin()

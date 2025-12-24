@@ -69,6 +69,7 @@ func WithMetadata(metadata map[string]interface{}) Option {
 
 // 日志状态常量
 const (
+	StatusStart   = "start" // 任务开始
 	StatusInfo    = "info"
 	StatusSuccess = "success"
 	StatusWarning = "warning"

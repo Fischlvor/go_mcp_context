@@ -327,6 +327,45 @@ go-mcp-context/
 
 ## 📝 开发日志
 
+### 2025-12-24
+
+#### Added
+- **actlog 同步写入方法**
+  - 新增 `StatusStart = "start"` 状态常量：标识任务开始
+  - 新增 `LogSync()` / `InfoSync()` / `InfoStartSync()`：同步写入日志（绕过缓冲区）
+  - 新增 `TaskLogger.InfoStartSync()`：任务开始日志同步写入
+  - 确保 API 返回前开始日志已入库，前端跳转后能立即查到
+
+#### Changed
+- **文档上传接口重构**
+  - 前端改用普通 API 上传（`uploadDocument`），不再使用 SSE
+  - 上传完成后跳转到 logs tab 查看处理进度
+  - SSE 上传代码保留为注释备用
+  - 上传时显示简单 loading 状态，不再显示进度条
+
+- **actlog 日志规范化**
+  - 开始日志：`status = "start"`（通过 `InfoStartSync`）
+  - 过程日志：`status = "info"`（通过 `Info`）
+  - 结束日志：`status = "success"`（通过 `Success`）
+  - 错误日志：`status = "error"`（通过 `Error`）
+  - 日志查询接口：只有 `success` 返回 `complete`，其他都是 `processing`
+
+- **actlog 使用统一化**
+  - `InitImportFromGitHub`：使用根 `TaskLogger`，各阶段通过 `WithTarget` 派生
+  - `ImportFromGitHub`：开始日志在 API 层同步写入
+  - `RefreshVersion`：改用 `actLogger.InfoStartSync()` 替代直接写 DB
+  - `Upload`：开始日志在 service 层同步写入，完成日志在调用方记录
+
+- **前端日志渲染优化**
+  - 优先根据 `status` 渲染颜色（start=紫色, success=绿色, error=红色, warning=黄色）
+  - `status === 'info'` 时再根据 `event` 渲染
+
+- **前端 UI 调整**
+  - 注释掉 Header 的 Plans, Learn, Try Live, Install 导航项
+  - "Chat with Docs" 按钮置灰
+
+---
+
 ### 2025-12-23
 
 #### Added
