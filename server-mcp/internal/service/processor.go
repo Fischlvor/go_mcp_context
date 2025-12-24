@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -530,18 +529,19 @@ func (p *DocumentProcessor) countTokens(text string) int {
 	return len(tokens)
 }
 
-// ProcessDocumentAsync 异步处理文档（单文档上传，无任务 ID）
-func (p *DocumentProcessor) ProcessDocumentAsync(doc *dbmodel.DocumentUpload, content []byte) {
+// ProcessDocumentAsync 异步处理文档（单文档上传）
+// actLogger: 已配置好的任务日志器
+func (p *DocumentProcessor) ProcessDocumentAsync(doc *dbmodel.DocumentUpload, content []byte, docLogger *actlog.TaskLogger) {
 	go func() {
-		// 单文档处理，无 taskID
-		docLogger := actlog.NewTaskLogger(doc.LibraryID, "", doc.Version).
-			WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10))
-
 		if err := p.ProcessDocument(doc, content, docLogger); err != nil {
 			log.Printf("[Processor] ERROR processing document %s: %v", doc.Title, err)
 			doc.Status = "failed"
 			doc.ErrorMessage = err.Error()
 			global.DB.Save(doc)
+			docLogger.Error(actlog.EventDocFailed, fmt.Sprintf("处理失败: %s - %s", doc.Title, err.Error()))
+		} else {
+			// 单文档上传任务完成
+			docLogger.Success(actlog.EventDocComplete, fmt.Sprintf("处理完成: %s", doc.Title))
 		}
 	}()
 }
@@ -647,7 +647,8 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 	}
 
 	log.Printf("[Processor] Successfully processed document: %s (chunks: %d, tokens: %d)", doc.Title, len(chunks), totalTokens)
-	actLogger.Info(actlog.EventDocComplete, fmt.Sprintf("处理完成: %s (%d 块, %d tokens)", doc.Title, len(chunks), totalTokens))
+	// SSE 版本单文档上传任务完成
+	actLogger.Success(actlog.EventDocComplete, fmt.Sprintf("上传完成: %s (%d 块, %d tokens)", doc.Title, len(chunks), totalTokens))
 	statusChan <- response.ProcessStatus{Stage: "completed", Progress: 100, Message: "处理完成", Status: "completed"}
 }
 

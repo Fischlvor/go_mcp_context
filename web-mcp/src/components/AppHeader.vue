@@ -38,13 +38,14 @@
       </div>
       <!-- 右侧导航 -->
       <div class="hidden md:flex md:w-auto md:flex-row md:items-center md:gap-3">
-        <span class="hidden text-base text-stone-500 underline underline-offset-2 md:block">Plans</span>
+        <!-- Plans, Learn, Try Live, Install 暂时隐藏 -->
+        <!-- <span class="hidden text-base text-stone-500 underline underline-offset-2 md:block">Plans</span>
         <span class="hidden h-4 w-px bg-stone-400 md:block"></span>
         <span class="hidden text-base text-stone-500 underline underline-offset-2 md:block">Learn</span>
         <span class="hidden h-4 w-px bg-stone-400 md:block"></span>
         <span class="hidden text-base text-stone-500 underline underline-offset-2 md:block">Try Live</span>
         <span class="hidden h-4 w-px bg-stone-400 md:block"></span>
-        <span class="hidden text-base text-stone-500 underline underline-offset-2 md:block">Install</span>
+        <span class="hidden text-base text-stone-500 underline underline-offset-2 md:block">Install</span> -->
         
         <!-- Add Docs 按钮 -->
         <button 

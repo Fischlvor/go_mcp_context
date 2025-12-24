@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"strconv"
 
-	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
 	"go-mcp-context/internal/service"
 	"go-mcp-context/pkg/bufferedwriter/actlog"
-	"go-mcp-context/pkg/global"
 	"go-mcp-context/pkg/utils"
 
 	"github.com/gin-gonic/gin"
@@ -324,18 +322,12 @@ func (l *LibraryApi) ImportFromGitHub(c *gin.Context) {
 	// 同步写入"导入开始"日志（确保 API 返回前日志已入库）
 	userUUID := utils.GetUUID(c).String()
 	taskID := utils.GenerateTaskID()
-	startLog := &dbmodel.ActivityLog{
-		LibraryID:  uint(id),
-		ActorID:    userUUID,
-		TaskID:     taskID,
-		Event:      actlog.EventGHImportStart,
-		Status:     actlog.StatusInfo,
-		Message:    fmt.Sprintf("开始导入: %s@%s", req.Repo, version),
-		Version:    version,
-		TargetType: "version",
-		TargetID:   version,
-	}
-	global.DB.Create(startLog)
+	actlog.InfoStartSync(uint(id), actlog.EventGHImportStart, fmt.Sprintf("开始导入: %s@%s", req.Repo, version),
+		actlog.WithActor(userUUID),
+		actlog.WithTaskID(taskID),
+		actlog.WithTarget("version", version),
+		actlog.WithVersion(version),
+	)
 
 	// 启动后台导入（传递 taskID）
 	req.TaskID = taskID
@@ -443,31 +435,20 @@ func (l *LibraryApi) InitImportFromGitHub(c *gin.Context) {
 		return
 	}
 
-	// 2. 记录活动日志
+	// 2. 创建根任务日志器
 	taskID := utils.GenerateTaskID()
+	rootLogger := actlog.NewTaskLogger(library.ID, taskID, "latest").
+		WithActor(userUUID)
 
-	actlog.Success(library.ID, actlog.EventLibCreate, fmt.Sprintf("从 GitHub 创建库: %s", library.Name),
-		actlog.WithActor(userUUID),
-		actlog.WithTarget("library", fmt.Sprintf("%d", library.ID)),
-		actlog.WithVersion("latest"),
-		actlog.WithTaskID(taskID),
-	)
+	// 3. 同步写入"开始"日志（确保 API 返回前日志已入库）
+	rootLogger.WithTarget("version", "latest").
+		InfoStartSync(actlog.EventGHImportStart, fmt.Sprintf("开始导入: %s@latest", library.SourceURL))
 
-	// 3. 同步写入"导入开始"日志（确保 API 返回前日志已入库）
-	startLog := &dbmodel.ActivityLog{
-		LibraryID:  library.ID,
-		ActorID:    userUUID,
-		TaskID:     taskID,
-		Event:      actlog.EventGHImportStart,
-		Status:     actlog.StatusInfo,
-		Message:    fmt.Sprintf("开始导入: %s@latest", library.SourceURL),
-		Version:    "latest",
-		TargetType: "version",
-		TargetID:   "latest",
-	}
-	global.DB.Create(startLog)
+	// 4. 记录库创建日志
+	rootLogger.WithTarget("library", fmt.Sprintf("%d", library.ID)).
+		Info(actlog.EventLibCreate, fmt.Sprintf("从 GitHub 创建库: %s", library.Name))
 
-	// 4. 异步导入（使用默认分支，版本名为 latest，传递 taskID）
+	// 5. 异步导入（使用默认分支，版本名为 latest，传递 taskID）
 	githubService := service.NewGitHubImportService()
 	go func() {
 		importReq := &request.GitHubImportRequest{
