@@ -10,6 +10,7 @@ import (
 	"go-mcp-context/internal/service"
 	"go-mcp-context/pkg/bufferedwriter/actlog"
 	"go-mcp-context/pkg/global"
+	"go-mcp-context/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -55,7 +56,11 @@ func (d *DocumentApi) Upload(c *gin.Context) {
 	}
 	defer file.Close()
 
-	doc, err := documentService.Upload(uint(libraryID), version, file, header)
+	// 获取用户和任务 ID（用于日志关联）
+	userUUID := utils.GetUUID(c).String()
+	taskID := utils.GenerateTaskID()
+
+	doc, err := documentService.Upload(uint(libraryID), version, file, header, userUUID, taskID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.FailWithMessage("库不存在", c)
@@ -73,11 +78,7 @@ func (d *DocumentApi) Upload(c *gin.Context) {
 		return
 	}
 
-	// 记录活动日志
-	actlog.Info(uint(libraryID), actlog.EventDocUpload, fmt.Sprintf("上传文档: %s", header.Filename),
-		actlog.WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10)),
-		actlog.WithVersion(version))
-
+	// 活动日志已在 service 层记录
 	response.OkWithDetailed(doc, "上传成功，正在处理中", c)
 }
 

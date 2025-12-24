@@ -113,7 +113,7 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 		}
 	}
 
-	// 创建任务日志器
+	// 创建任务日志器（开始日志已在 API 层同步写入）
 	actLogger := actlog.NewTaskLogger(libraryID, taskID, version).
 		WithTarget("version", version).
 		WithActor(actorID)

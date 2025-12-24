@@ -117,6 +117,52 @@ func Error(libraryID uint, event, message string, opts ...Option) {
 	Log(libraryID, event, StatusError, message, opts...)
 }
 
+// LogSync 同步记录活动日志（绕过缓冲区，直接写入数据库）
+func LogSync(libraryID uint, event, status, message string, opts ...Option) {
+	mu.RLock()
+	writer := defaultWriter
+	mu.RUnlock()
+
+	if writer == nil {
+		log.Printf("[actlog] Not initialized, dropping log: %s", message)
+		return
+	}
+
+	// 应用选项
+	options := &Options{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	entry := &LogEntry{
+		LibraryID:  libraryID,
+		ActorID:    options.ActorID,
+		Event:      event,
+		Status:     status,
+		Message:    message,
+		TargetType: options.TargetType,
+		TargetID:   options.TargetID,
+		TaskID:     options.TaskID,
+		Version:    options.Version,
+		Metadata:   options.Metadata,
+		CreatedAt:  time.Now(),
+	}
+
+	if err := writer.WriteBatch([]*LogEntry{entry}); err != nil {
+		log.Printf("[actlog] Failed to write sync log: %v", err)
+	}
+}
+
+// InfoSync 同步记录 info 级别日志
+func InfoSync(libraryID uint, event, message string, opts ...Option) {
+	LogSync(libraryID, event, StatusInfo, message, opts...)
+}
+
+// InfoStartSync 同步记录任务开始日志（绕过缓冲区，确保 API 返回前日志已入库）
+func InfoStartSync(libraryID uint, event, message string, opts ...Option) {
+	LogSync(libraryID, event, StatusStart, message, opts...)
+}
+
 // ============================================================================
 // TaskLogger: 任务级别日志器，预填充公共字段
 // ============================================================================
@@ -191,6 +237,16 @@ func (l *TaskLogger) Log(event, status, message string, opts ...Option) {
 // Info 记录 info 级别日志
 func (l *TaskLogger) Info(event, message string, opts ...Option) {
 	Info(l.libraryID, event, message, l.buildOpts(opts...)...)
+}
+
+// InfoSync 同步记录 info 级别日志（绕过缓冲区，直接写入数据库）
+func (l *TaskLogger) InfoSync(event, message string, opts ...Option) {
+	InfoSync(l.libraryID, event, message, l.buildOpts(opts...)...)
+}
+
+// InfoStartSync 同步记录任务开始日志（绕过缓冲区，确保 API 返回前日志已入库）
+func (l *TaskLogger) InfoStartSync(event, message string, opts ...Option) {
+	InfoStartSync(l.libraryID, event, message, l.buildOpts(opts...)...)
 }
 
 // Success 记录 success 级别日志
