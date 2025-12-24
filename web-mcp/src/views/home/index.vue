@@ -36,7 +36,7 @@
             />
           </div>
           <span class="text-sm font-normal text-stone-400">or</span>
-          <a class="flex h-11 w-full items-center justify-center rounded-xl border border-stone-400 bg-white px-4 text-sm text-stone-600 shadow-md transition-colors hover:border-emerald-600 hover:text-emerald-600 focus:border-emerald-600 sm:text-base md:h-[50px] md:w-auto" href="#">Chat with Docs</a>
+          <span class="flex h-11 w-full items-center justify-center rounded-xl border border-stone-300 bg-stone-100 px-4 text-sm text-stone-400 shadow-md cursor-not-allowed sm:text-base md:h-[50px] md:w-auto">Chat with Docs</span>
         </div>
       </div>
 

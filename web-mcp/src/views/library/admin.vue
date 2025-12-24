@@ -289,9 +289,9 @@ import AddVersionModal from '@/components/AddVersionModal.vue'
 import { useUser } from '@/stores/user'
 import { getLibrary, updateLibrary, deleteVersion, refreshVersion, deleteLibrary, getVersions } from '@/api/library'
 import { useRouter } from 'vue-router'
-import { getDocuments, deleteDocument, uploadDocumentWithSSE } from '@/api/document'
+import { getDocuments, deleteDocument, uploadDocument } from '@/api/document'
 import type { Library } from '@/api/library'
-import type { Document, ProcessStatus } from '@/api/document'
+import type { Document } from '@/api/document'
 
 const route = useRoute()
 const router = useRouter()
@@ -424,38 +424,21 @@ const handleFileUpload = async (event: Event) => {
     return
   }
 
-  // 重置状态
+  // 显示上传中状态
   uploading.value = true
-  uploadProgress.value = 0
-  uploadMessage.value = 'Uploading...'
 
   try {
-    // 创建 FormData 并添加版本信息
-    const formData = new FormData()
-    formData.append('library_id', libraryId.value.toString())
-    formData.append('version', selectedVersion.value)
-    formData.append('file', file)
-
-    // 使用普通上传接口（后台异步处理，通过日志查看进度）
-    const response = await fetch(`/api/documents/upload?library_id=${libraryId.value}&version=${selectedVersion.value}`, {
-      method: 'POST',
-      body: formData
-    })
+    // 使用统一的 API 接口上传（后台异步处理，通过日志查看进度）
+    await uploadDocument(libraryId.value, file, selectedVersion.value)
     
-    if (response.ok) {
-      ElMessage.success('上传已启动，跳转到控制台查看进度')
-      uploading.value = false
-      uploadProgress.value = 0
-      uploadMessage.value = ''
-      // 跳转到详情页的控制台 tab
-      router.push({ 
-        name: 'library-detail', 
-        params: { id: libraryId.value }, 
-        query: { tab: 'logs' } 
-      })
-    } else {
-      throw new Error('Upload failed')
-    }
+    uploading.value = false
+    ElMessage.success('上传已启动，跳转到控制台查看进度')
+    // 跳转到详情页的控制台 tab
+    router.push({ 
+      name: 'library-detail', 
+      params: { id: libraryId.value }, 
+      query: { tab: 'logs' } 
+    })
 
     // ====== 以下是 SSE 版本的代码，保留备用 ======
     // const eventSource = new EventSource(`/api/documents/upload-sse?library_id=${libraryId.value}&version=${selectedVersion.value}`)

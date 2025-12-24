@@ -33,11 +33,11 @@ func (s *ActivityLogService) ListByLatestTask(libraryID uint) (*ActivityLogResul
 		}, nil
 	}
 
-	// 判断任务状态：最新日志（最后一条）是 info 说明还在处理中
-	status := "complete"
+	// 判断任务状态：只有最后一条日志是 success 才表示完成，其他都是处理中
+	status := "processing"
 	lastLog := logs[len(logs)-1]
-	if lastLog.Status == "info" {
-		status = "processing"
+	if lastLog.Status == "success" {
+		status = "complete"
 	}
 
 	return &ActivityLogResult{
