@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"strings"
 
 	dbmodel "go-mcp-context/internal/model/database"
@@ -64,18 +63,30 @@ func (s *MCPService) SearchLibraries(req *request.MCPSearchLibraries) (*response
 		// 计算匹配分数
 		score := calculateMatchScore(req.LibraryName, lib.Name)
 
-		// 使用默认版本或 latest
-		version := lib.DefaultVersion
-		if version == "" {
-			version = "latest"
+		// 获取版本列表
+		versions := []string(lib.Versions)
+		if len(versions) == 0 {
+			defaultVer := lib.DefaultVersion
+			if defaultVer == "" {
+				defaultVer = "latest"
+			}
+			versions = []string{defaultVer}
 		}
+
+		// 默认版本
+		defaultVersion := lib.DefaultVersion
+		if defaultVersion == "" {
+			defaultVersion = "latest"
+		}
+
 		result.Libraries = append(result.Libraries, response.MCPLibraryInfo{
-			ID:          fmt.Sprintf("%s/%s", lib.Name, version),
-			Name:        lib.Name,
-			Version:     version,
-			Description: lib.Description,
-			Snippets:    int(snippetCount),
-			Score:       score,
+			LibraryID:      lib.ID,
+			Name:           lib.Name,
+			Versions:       versions,
+			DefaultVersion: defaultVersion,
+			Description:    lib.Description,
+			Snippets:       int(snippetCount),
+			Score:          score,
 		})
 	}
 
@@ -87,29 +98,21 @@ func (s *MCPService) SearchLibraries(req *request.MCPSearchLibraries) (*response
 
 // GetLibraryDocs 获取库文档（MCP 工具）
 func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.MCPGetLibraryDocsResult, error) {
-	// 解析 libraryID (格式: name/version 或 name)
-	parts := strings.SplitN(req.LibraryID, "/", 2)
-	name := parts[0]
-	version := ""
-	if len(parts) == 2 {
-		version = parts[1]
-	}
-
-	// 查找库
+	// 根据 libraryID 查找库
 	libraryService := &LibraryService{}
-	library, err := libraryService.GetByName(name)
+	library, err := libraryService.GetByID(req.LibraryID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
 
 	// 如果未指定版本，使用默认版本
+	version := req.Version
 	if version == "" {
 		version = library.DefaultVersion
 		if version == "" {
 			version = "latest"
 		}
 	}
-	_ = version // 版本用于后续版本过滤
 
 	// 分页参数
 	page := req.Page
@@ -147,6 +150,7 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 		stats.IncrementWithLibrary(library.ID, dbmodel.MetricMCPGetLibraryDocs, 1)
 
 		return &response.MCPGetLibraryDocsResult{
+			LibraryID: library.ID,
 			Documents: documents,
 			Page:      page,
 			HasMore:   searchResult.HasMore,
@@ -175,6 +179,7 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 	stats.IncrementWithLibrary(library.ID, dbmodel.MetricMCPGetLibraryDocs, 1)
 
 	return &response.MCPGetLibraryDocsResult{
+		LibraryID: library.ID,
 		Documents: documents,
 		Page:      page,
 		HasMore:   int64(page*limit) < total,

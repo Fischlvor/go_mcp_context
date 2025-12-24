@@ -15,7 +15,8 @@ type MCPSearchLibraries struct {
 
 // MCPGetLibraryDocs get-library-docs 工具参数
 type MCPGetLibraryDocs struct {
-	LibraryID string `json:"libraryID"`
+	LibraryID uint   `json:"libraryId"` // 库的数据库 ID
+	Version   string `json:"version"`   // 版本（可选，默认使用 defaultVersion）
 	Topic     string `json:"topic"`
 	Mode      string `json:"mode"` // code, info
 	Page      int    `json:"page"` // 1-10
