@@ -330,6 +330,16 @@ go-mcp-context/
 ### 2025-12-24
 
 #### Added
+- **MCP 调用日志系统**
+  - 新增 `mcp_call_logs` 表：记录 MCP 接口调用详情
+  - 新增 `pkg/bufferedwriter/mcplog` 包：异步批量写入 MCP 调用日志
+  - 记录字段：`actor_id`、`func_name`、`library_id`、`params`（JSON）、`result_count`、`latency_ms`、`status`、`error_msg`
+  - 在 `handleToolCall` 统一记录日志，新增工具只需实现 `doXxx(args) MCPToolResult`
+
+- **API Key 使用次数统计**
+  - `api_keys` 表新增 `usage_count` 字段
+  - 每次 MCP 调用自动 `usage_count + 1`（数据库原子操作）
+
 - **actlog 同步写入方法**
   - 新增 `StatusStart = "start"` 状态常量：标识任务开始
   - 新增 `LogSync()` / `InfoSync()` / `InfoStartSync()`：同步写入日志（绕过缓冲区）
@@ -337,6 +347,17 @@ go-mcp-context/
   - 确保 API 返回前开始日志已入库，前端跳转后能立即查到
 
 #### Changed
+- **MCP 接口重构**
+  - `search-libraries` 返回：`libraryId`（uint）+ `versions`（数组）+ `defaultVersion`
+  - `get-library-docs` 参数：`libraryId`（uint）+ `version`（可选）+ `topic` + `mode` + `page`
+  - 移除旧的 `id: "name/version"` 格式
+
+- **缓冲写入器统一管理**
+  - 新增 `initialize/buffered_writers.go`
+  - `InitBufferedWriters()`：统一初始化 actlog、stats、mcplog
+  - `CloseBufferedWriters()`：统一关闭并刷新缓冲区
+  - `main.go` 简化为两行调用
+
 - **文档上传接口重构**
   - 前端改用普通 API 上传（`uploadDocument`），不再使用 SSE
   - 上传完成后跳转到 logs tab 查看处理进度

@@ -47,6 +47,7 @@ func InitTables() {
 		&dbmodel.APIKey{},
 		&dbmodel.Statistics{},
 		&dbmodel.ActivityLog{},
+		&dbmodel.MCPCallLog{},
 	); err != nil {
 		fmt.Printf("Failed to migrate database: %v\n", err)
 		os.Exit(1)

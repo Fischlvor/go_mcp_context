@@ -13,6 +13,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 const (
@@ -146,10 +147,13 @@ func (s *ApiKeyService) ValidateAPIKey(apiKey string) (string, error) {
 		return "", errors.New("无效的 API Key")
 	}
 
-	// 更新最后使用时间（异步，不阻塞请求）
+	// 更新使用次数和最后使用时间（异步，不阻塞请求）
 	go func() {
 		now := time.Now()
-		global.DB.Model(&token).Update("last_used_at", now)
+		global.DB.Model(&token).Updates(map[string]interface{}{
+			"usage_count":  gorm.Expr("usage_count + 1"),
+			"last_used_at": now,
+		})
 	}()
 
 	return token.UserUUID, nil
