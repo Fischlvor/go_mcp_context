@@ -252,7 +252,7 @@ func (s *DocumentService) UploadWithCallback(libraryID uint, version string, fil
 	processor := &DocumentProcessor{}
 	docLogger := actlog.NewTaskLogger(doc.LibraryID, "", doc.Version).
 		WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10))
-	go processor.ProcessDocumentWithCallback(doc, content, statusChan, docLogger)
+	go processor.ProcessDocumentWithCallback(doc, content, statusChan, docLogger, true) // 单文档上传是独立任务
 
 	return doc, nil
 }
@@ -309,7 +309,7 @@ func (s *DocumentService) GetLatestContent(libraryID uint, version string) (stri
 
 // GetChunks 获取库的文档块
 // mode: "code" 只返回代码块, "info" 只返回文档块, "" 返回全部
-func (s *DocumentService) GetChunks(libraryID uint, version string, mode string) ([]dbmodel.DocumentChunk, error) {
+func (s *DocumentService) GetChunks(libraryID uint, version string, mode string, limit int) ([]dbmodel.DocumentChunk, error) {
 	var chunks []dbmodel.DocumentChunk
 	query := global.DB.Where("library_id = ? AND status = ?", libraryID, "active")
 
@@ -325,7 +325,7 @@ func (s *DocumentService) GetChunks(libraryID uint, version string, mode string)
 		query = query.Where("chunk_type = ?", "info")
 	}
 
-	if err := query.Order("chunk_index ASC").Find(&chunks).Error; err != nil {
+	if err := query.Order("chunk_index ASC").Limit(limit).Find(&chunks).Error; err != nil {
 		return nil, err
 	}
 

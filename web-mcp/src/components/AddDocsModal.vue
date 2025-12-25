@@ -199,8 +199,7 @@ const handleSubmit = async () => {
       // Local 创建
       const result = await createLibrary({
         name: localName.value.trim(),
-        description: localDescription.value.trim(),
-        source_type: 'local'
+        description: localDescription.value.trim()
       })
       
       ElMessage.success('库创建成功')

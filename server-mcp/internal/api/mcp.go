@@ -41,26 +41,26 @@ func (m *MCPApi) ListTools(c *gin.Context) {
 		},
 		{
 			Name:        "get-library-docs",
-			Description: "Get documentation from a specific library. Returns relevant code snippets and documentation.",
+			Description: "Get documentation from libraries. If libraryId is provided, search within that library; otherwise search across all libraries.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
 					"libraryId": map[string]interface{}{
 						"type":        "integer",
-						"description": "The database ID of the library (from search-libraries result)",
+						"description": "The database ID of the library (optional, from search-libraries result). If not provided, search across all libraries.",
 					},
 					"version": map[string]interface{}{
 						"type":        "string",
-						"description": "The version of the library (optional, defaults to defaultVersion)",
+						"description": "The version of the library (optional, empty means all versions)",
 					},
 					"topic": map[string]interface{}{
 						"type":        "string",
-						"description": "The topic or query to search for",
+						"description": "The topic or query to search for. Supports multiple topics separated by comma (e.g. 'routing, middleware')",
 					},
 					"mode": map[string]interface{}{
 						"type":        "string",
 						"enum":        []string{"code", "info"},
-						"description": "Filter by content type: 'code' for code examples, 'info' for documentation",
+						"description": "Filter by content type: 'code' for code examples, 'info' for documentation (optional, empty means all types)",
 					},
 					"page": map[string]interface{}{
 						"type":        "integer",
@@ -70,7 +70,7 @@ func (m *MCPApi) ListTools(c *gin.Context) {
 						"default":     1,
 					},
 				},
-				"required": []string{"libraryId", "topic"},
+				"required": []string{"topic"},
 			},
 		},
 	}
@@ -252,11 +252,21 @@ func doGetLibraryDocs(args map[string]interface{}) MCPToolResult {
 		page = int(p)
 	}
 
-	if libraryID == 0 || topic == "" {
+	if topic == "" {
 		return MCPToolResult{
 			Error: &response.MCPError{
 				Code:    -32602,
-				Message: "Invalid params: libraryId and topic are required",
+				Message: "Invalid params: topic is required",
+			},
+		}
+	}
+
+	// 验证 mode 值（允许为空，表示搜索所有类型）
+	if mode != "" && mode != "code" && mode != "info" {
+		return MCPToolResult{
+			Error: &response.MCPError{
+				Code:    -32602,
+				Message: "Invalid params: mode must be 'code' or 'info'",
 			},
 		}
 	}
