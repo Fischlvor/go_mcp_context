@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"text/template"
 
 	"github.com/sashabaranov/go-openai"
@@ -148,6 +149,47 @@ const enrichPromptTemplate = `You are a technical documentation expert. Generate
 - description: Explain what it does, when to use it, and key points
 - **Keep the same language as the original document** (if the doc is in English, respond in English; if in Chinese, respond in Chinese)
 - Return strict JSON only, no other content`
+
+// GenerateLibraryTitle 为库生成简短友好的名称
+func (l *OpenAILLM) GenerateLibraryTitle(ctx context.Context, repoName, description string) (string, error) {
+	prompt := fmt.Sprintf(`Generate a short, friendly library name (1-3 words) for this GitHub repository.
+
+Repository: %s
+Description: %s
+
+Rules:
+- Output ONLY the library name, nothing else
+- Keep it short: 1-3 words maximum
+- Use proper capitalization (e.g., "Gin", "Next.js", "React Router")
+- If the repo name is already a good title, just capitalize it properly
+- Do NOT include "Library", "Framework", "SDK" unless it's part of the official name
+- Examples: "gin-gonic/gin" → "Gin", "vercel/next.js" → "Next.js", "facebook/react" → "React", "gin-gonic/examples" → "Gin Examples"
+
+Output:`, repoName, description)
+
+	resp, err := l.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: l.model,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleUser, Content: prompt},
+		},
+		MaxTokens:   20,  // 只需要很短的输出
+		Temperature: 0.1, // 低温度，更确定性
+	})
+	if err != nil {
+		return "", fmt.Errorf("openai chat completion failed: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no response from openai")
+	}
+
+	// 清理输出（去除空白和引号）
+	title := resp.Choices[0].Message.Content
+	title = strings.TrimSpace(title)
+	title = strings.Trim(title, `"'`)
+
+	return title, nil
+}
 
 // 确保 OpenAILLM 实现了 LLMService 接口
 var _ LLMService = (*OpenAILLM)(nil)

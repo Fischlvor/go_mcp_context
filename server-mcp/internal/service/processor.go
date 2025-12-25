@@ -548,7 +548,8 @@ func (p *DocumentProcessor) ProcessDocumentAsync(doc *dbmodel.DocumentUpload, co
 
 // ProcessDocumentWithCallback 处理文档（带状态回调和任务日志器）
 // actLogger 应已设置好 document target
-func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpload, content []byte, statusChan chan response.ProcessStatus, actLogger *actlog.TaskLogger) {
+// isFinalTask: true 表示独立任务（单文档上传），完成时用 Success；false 表示中间步骤（GitHub 导入），用 Info
+func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpload, content []byte, statusChan chan response.ProcessStatus, actLogger *actlog.TaskLogger, isFinalTask bool) {
 	defer close(statusChan)
 
 	log.Printf("[Processor] Starting to process document: %s (ID: %d)", doc.Title, doc.ID)
@@ -647,8 +648,12 @@ func (p *DocumentProcessor) ProcessDocumentWithCallback(doc *dbmodel.DocumentUpl
 	}
 
 	log.Printf("[Processor] Successfully processed document: %s (chunks: %d, tokens: %d)", doc.Title, len(chunks), totalTokens)
-	// SSE 版本单文档上传任务完成
-	actLogger.Success(actlog.EventDocComplete, fmt.Sprintf("上传完成: %s (%d 块, %d tokens)", doc.Title, len(chunks), totalTokens))
+	// 根据是否是独立任务决定日志级别
+	if isFinalTask {
+		actLogger.Success(actlog.EventDocComplete, fmt.Sprintf("处理完成: %s (%d 块, %d tokens)", doc.Title, len(chunks), totalTokens))
+	} else {
+		actLogger.Info(actlog.EventDocComplete, fmt.Sprintf("处理完成: %s (%d 块, %d tokens)", doc.Title, len(chunks), totalTokens))
+	}
 	statusChan <- response.ProcessStatus{Stage: "completed", Progress: 100, Message: "处理完成", Status: "completed"}
 }
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -383,6 +384,7 @@ type TarballFile struct {
 
 // DownloadTarballFiles 下载 tarball 并流式提取指定文件
 // 返回一个 channel，每提取一个文件就发送一次
+// ref 可以是 branch 名或 tag 名，会自动尝试两种 URL 格式
 func (c *Client) DownloadTarballFiles(ctx context.Context, repo, ref string, filter func(path string) bool) (<-chan TarballFile, <-chan error) {
 	fileChan := make(chan TarballFile, 10)
 	errChan := make(chan error, 1)
@@ -391,8 +393,8 @@ func (c *Client) DownloadTarballFiles(ctx context.Context, repo, ref string, fil
 		defer close(fileChan)
 		defer close(errChan)
 
-		// tarball URL
-		url := fmt.Sprintf("https://github.com/%s/archive/refs/tags/%s.tar.gz", repo, ref)
+		// 使用 codeload.github.com 直接下载（无需重定向，branch 和 tag 通用格式）
+		url := fmt.Sprintf("https://codeload.github.com/%s/tar.gz/%s", repo, ref)
 
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
@@ -409,12 +411,13 @@ func (c *Client) DownloadTarballFiles(ctx context.Context, repo, ref string, fil
 			errChan <- err
 			return
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
 			errChan <- fmt.Errorf("failed to download tarball: %d", resp.StatusCode)
 			return
 		}
+		defer resp.Body.Close()
 
 		// 流式解压 gzip
 		gzReader, err := gzip.NewReader(resp.Body)
@@ -426,6 +429,8 @@ func (c *Client) DownloadTarballFiles(ctx context.Context, repo, ref string, fil
 
 		// 流式读取 tar
 		tarReader := tar.NewReader(gzReader)
+		fileCount := 0
+		matchedCount := 0
 
 		for {
 			header, err := tarReader.Next()
@@ -433,6 +438,7 @@ func (c *Client) DownloadTarballFiles(ctx context.Context, repo, ref string, fil
 				break
 			}
 			if err != nil {
+				log.Printf("[GitHub] Failed to read tar entry: %v", err)
 				errChan <- fmt.Errorf("failed to read tar: %w", err)
 				return
 			}
@@ -441,6 +447,7 @@ func (c *Client) DownloadTarballFiles(ctx context.Context, repo, ref string, fil
 			if header.Typeflag != tar.TypeReg {
 				continue
 			}
+			fileCount++
 
 			// 去掉第一层目录（repo-tag/）
 			path := header.Name
@@ -452,10 +459,13 @@ func (c *Client) DownloadTarballFiles(ctx context.Context, repo, ref string, fil
 			if !filter(path) {
 				continue
 			}
+			matchedCount++
+			log.Printf("[GitHub] Matched file: %s", path)
 
 			// 读取文件内容（只有匹配的文件才读取）
 			content, err := io.ReadAll(tarReader)
 			if err != nil {
+				log.Printf("[GitHub] Failed to read file content: %s - %v", path, err)
 				continue // 跳过读取失败的文件
 			}
 
@@ -465,6 +475,7 @@ func (c *Client) DownloadTarballFiles(ctx context.Context, repo, ref string, fil
 				Size:    header.Size,
 			}
 		}
+		log.Printf("[GitHub] Tarball processing complete: %d files scanned, %d matched", fileCount, matchedCount)
 	}()
 
 	return fileChan, errChan

@@ -92,28 +92,16 @@ func (s *LibraryService) List(req *request.LibraryList) (*response.PageResult, e
 	}, nil
 }
 
-// Create 创建库
+// Create 创建库（Local 类型）
 func (s *LibraryService) Create(req *request.LibraryCreate) (*dbmodel.Library, error) {
-	// 默认 source_type 为 local
-	sourceType := req.SourceType
-	if sourceType == "" {
-		sourceType = "local"
-	}
-
-	// 默认版本
-	defaultVersion := req.DefaultVersion
-	if defaultVersion == "" {
-		defaultVersion = "default"
-	}
-
 	library := &dbmodel.Library{
 		Name:           req.Name,
 		Description:    req.Description,
-		SourceType:     sourceType,
-		SourceURL:      req.SourceURL,
+		SourceType:     "local",
+		SourceURL:      "",
 		Status:         "active",
-		DefaultVersion: defaultVersion,
-		Versions:       []string{}, // versions 只存正常版本，不包含 default
+		DefaultVersion: "latest",
+		Versions:       []string{},
 		CreatedBy:      req.CreatedBy,
 	}
 
@@ -142,48 +130,74 @@ func (s *LibraryService) getBySourceURL(sourceURL string) (*dbmodel.Library, err
 	return &library, nil
 }
 
+// InitFromGitHubResult 初始化导入结果
+type InitFromGitHubResult struct {
+	Library       *dbmodel.Library
+	DefaultBranch string
+	RepoName      string // 原始 repo 名（如 gin）
+	LLMTitle      string // LLM 生成的名称（如 Gin），为空表示未使用 LLM
+}
+
 // InitFromGitHub 从 GitHub URL 初始化创建库
 // 流程：解析 URL -> 验证连通性 -> 检查重复 -> 创建库
-// 返回：库信息、仓库默认分支、错误
-func (s *LibraryService) InitFromGitHub(ctx context.Context, githubURL string, createdBy string) (*dbmodel.Library, string, error) {
+// 返回：初始化结果、错误
+func (s *LibraryService) InitFromGitHub(ctx context.Context, githubURL string, createdBy string) (*InitFromGitHubResult, error) {
 	// 1. 解析 GitHub URL
 	repo, err := utils.ParseGitHubURL(githubURL)
 	if err != nil {
-		return nil, "", fmt.Errorf("无效的 GitHub URL: %w", err)
+		return nil, fmt.Errorf("无效的 GitHub URL: %w", err)
 	}
 
-	// 2. 验证仓库连通性
+	// 2. 检查是否已存在
+	existingLib, _ := s.getBySourceURL(repo)
+	if existingLib != nil {
+		return nil, fmt.Errorf("该库已存在: %s (ID: %d)", existingLib.Name, existingLib.ID)
+	}
+
+	// 3. 验证仓库连通性
 	githubService := NewGitHubImportService()
 	repoInfo, err := githubService.GetRepoInfo(ctx, repo)
 	if err != nil {
-		return nil, "", fmt.Errorf("无法访问仓库: %w", err)
+		return nil, fmt.Errorf("无法访问仓库: %w", err)
 	}
 
-	// 3. 检查是否已存在
-	existingLib, _ := s.getBySourceURL(repo)
-	if existingLib != nil {
-		return nil, "", fmt.Errorf("该库已存在: %s (ID: %d)", existingLib.Name, existingLib.ID)
+	// 4. 使用 LLM 生成友好的库名
+	repoName := utils.ExtractRepoName(repo) // 原始 repo 名
+	libraryName := repoName
+	llmTitle := ""
+	if global.LLM != nil {
+		if title, err := global.LLM.GenerateLibraryTitle(ctx, repo, repoInfo.Description); err == nil && title != "" {
+			libraryName = title
+			llmTitle = title
+		}
 	}
 
-	// 4. 创建库（默认版本为 latest）
-	repoName := utils.ExtractRepoName(repo)
-	library, err := s.Create(&request.LibraryCreate{
-		Name:           repoName,
+	// 5. 创建库（GitHub 类型，直接创建而非通过 LibraryCreate）
+	library := &dbmodel.Library{
+		Name:           libraryName,
 		Description:    repoInfo.Description,
 		SourceType:     "github",
 		SourceURL:      repo,
+		Status:         "active",
 		DefaultVersion: "latest",
+		Versions:       []string{},
 		CreatedBy:      createdBy,
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("创建库失败: %w", err)
 	}
 
-	return library, repoInfo.DefaultBranch, nil
+	if err := global.DB.Create(library).Error; err != nil {
+		return nil, fmt.Errorf("创建库失败: %w", err)
+	}
+
+	return &InitFromGitHubResult{
+		Library:       library,
+		DefaultBranch: repoInfo.DefaultBranch,
+		RepoName:      repoName,
+		LLMTitle:      llmTitle,
+	}, nil
 }
 
-// Update 更新库
-func (s *LibraryService) Update(id uint, req *request.LibraryCreate) (*dbmodel.Library, error) {
+// Update 更新库（只允许修改 name 和 description）
+func (s *LibraryService) Update(id uint, req *request.LibraryUpdate) (*dbmodel.Library, error) {
 	var library dbmodel.Library
 	if err := global.DB.First(&library, id).Error; err != nil {
 		return nil, err
@@ -191,8 +205,6 @@ func (s *LibraryService) Update(id uint, req *request.LibraryCreate) (*dbmodel.L
 
 	library.Name = req.Name
 	library.Description = req.Description
-	library.SourceType = req.SourceType
-	library.SourceURL = req.SourceURL
 
 	if err := global.DB.Save(&library).Error; err != nil {
 		return nil, err

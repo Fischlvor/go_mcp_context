@@ -17,10 +17,20 @@ func (s *SearchApi) Search(c *gin.Context) {
 		return
 	}
 
+	if req.LibraryID == 0 {
+		response.FailWithMessage("library_id 必须大于 0", c)
+		return
+	}
+
+	if req.Version == "" {
+		response.FailWithMessage("version 为必填参数", c)
+		return
+	}
+
 	if req.Page <= 0 {
 		req.Page = 1
 	}
-	if req.Limit <= 0 || req.Limit > 50 {
+	if req.Limit <= 0 || req.Limit > 10 {
 		req.Limit = 10
 	}
 

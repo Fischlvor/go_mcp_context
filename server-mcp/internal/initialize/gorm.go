@@ -2,11 +2,15 @@ package initialize
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
+	"time"
 
 	dbmodel "go-mcp-context/internal/model/database"
 	"go-mcp-context/pkg/global"
 
+	"github.com/natefinch/lumberjack"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -16,8 +20,29 @@ import (
 func InitGorm() *gorm.DB {
 	pgCfg := global.Config.Postgres
 
+	gormLogSink := io.Discard
+	if pgCfg.GormLogFile != "" {
+		gormLogSink = &lumberjack.Logger{
+			Filename:   pgCfg.GormLogFile,
+			MaxSize:    100,
+			MaxBackups: 7,
+			MaxAge:     30,
+			Compress:   true,
+		}
+	}
+
+	gormLogger := logger.New(
+		log.New(gormLogSink, "", log.LstdFlags|log.Lshortfile),
+		logger.Config{
+			SlowThreshold:             time.Second,
+			LogLevel:                  logger.Info,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  false,
+		},
+	)
+
 	db, err := gorm.Open(postgres.Open(pgCfg.Dsn()), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+		Logger: gormLogger,
 	})
 	if err != nil {
 		fmt.Printf("Failed to connect to PostgreSQL: %v\n", err)
@@ -74,10 +99,52 @@ func createIndexes() {
 	ftsSQL := `
 		CREATE INDEX IF NOT EXISTS idx_chunks_text 
 		ON document_chunks 
-		USING gin(to_tsvector('english', chunk_text))
+		USING gin(chunk_tsvector_simple)
 	`
 	if err := global.DB.Exec(ftsSQL).Error; err != nil {
 		fmt.Printf("Warning: Could not create full-text index: %v\n", err)
+	}
+
+	// 简单配置全文索引（simple 可选 chunk_type）
+	simpleSQL := `
+		CREATE INDEX IF NOT EXISTS idx_chunks_text_simple_active
+		ON document_chunks
+		USING gin(chunk_tsvector_simple)
+		WHERE status = 'active' AND deleted_at IS NULL;
+	`
+	if err := global.DB.Exec(simpleSQL).Error; err != nil {
+		fmt.Printf("Warning: Could not create simple full-text index: %v\n", err)
+	}
+
+	// simple 配置下的 chunk_type 定向全文索引
+	simpleCodeSQL := `
+		CREATE INDEX IF NOT EXISTS idx_chunks_text_simple_active_code
+		ON document_chunks
+		USING gin(chunk_tsvector_simple)
+		WHERE status = 'active' AND deleted_at IS NULL AND chunk_type = 'code';
+	`
+	if err := global.DB.Exec(simpleCodeSQL).Error; err != nil {
+		fmt.Printf("Warning: Could not create simple full-text code index: %v\n", err)
+	}
+
+	simpleInfoSQL := `
+		CREATE INDEX IF NOT EXISTS idx_chunks_text_simple_active_info
+		ON document_chunks
+		USING gin(chunk_tsvector_simple)
+		WHERE status = 'active' AND deleted_at IS NULL AND chunk_type = 'info';
+	`
+	if err := global.DB.Exec(simpleInfoSQL).Error; err != nil {
+		fmt.Printf("Warning: Could not create simple full-text info index: %v\n", err)
+	}
+
+	// library/version/type 过滤索引，兼顾 chunk_index 顺序
+	chunkFilterSQL := `
+		CREATE INDEX IF NOT EXISTS idx_chunks_library_version_type
+		ON document_chunks (library_id, version, chunk_type, chunk_index)
+		WHERE status = 'active' AND deleted_at IS NULL;
+	`
+	if err := global.DB.Exec(chunkFilterSQL).Error; err != nil {
+		fmt.Printf("Warning: Could not create library/version filter index: %v\n", err)
 	}
 
 	// 活动日志 BRIN 索引（时序数据优化）

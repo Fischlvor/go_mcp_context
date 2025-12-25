@@ -73,8 +73,8 @@
                       <span class="text-sm font-normal uppercase text-stone-500">MCP URL</span>
                       <span class="hidden text-sm text-stone-500 sm:block">:</span>
                       <div class="flex items-center gap-2">
-                        <span class="text-base font-medium text-stone-800">mcp.context7.com/mcp</span>
-                        <button class="text-stone-400 transition-colors hover:text-stone-600" @click="copyToClipboard('mcp.context7.com/mcp')">
+                        <span class="text-base font-medium text-stone-800">mcp.hsk423.cn/mcp</span>
+                        <button class="text-stone-400 transition-colors hover:text-stone-600" @click="copyToClipboard('https://mcp.hsk423.cn/mcp')">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
                             <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
@@ -82,13 +82,14 @@
                         </button>
                       </div>
                     </div>
+                    <!-- API URL 暂时注释
                     <div class="border-t border-stone-200"></div>
                     <div class="flex flex-col gap-2 py-3 sm:grid sm:grid-cols-[80px_auto_1fr] sm:items-center sm:py-2">
                       <span class="text-sm font-normal uppercase text-stone-500">API URL</span>
                       <span class="hidden text-sm text-stone-500 sm:block">:</span>
                       <div class="flex items-center gap-2">
-                        <span class="text-base font-medium text-stone-800">context7.com/api/v2</span>
-                        <button class="text-stone-400 transition-colors hover:text-stone-600" @click="copyToClipboard('context7.com/api/v2')">
+                        <span class="text-base font-medium text-stone-800">mcp.hsk423.cn/api/v1</span>
+                        <button class="text-stone-400 transition-colors hover:text-stone-600" @click="copyToClipboard('https://mcp.hsk423.cn/api/v1')">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
                             <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
@@ -96,6 +97,7 @@
                         </button>
                       </div>
                     </div>
+                    -->
                   </div>
 
                   <!-- IDE Tabs -->
@@ -110,26 +112,14 @@
                               activeIde === ide.id ? 'rounded-t-lg border border-stone-300 border-b-transparent text-stone-800' : 'border border-stone-300 border-l-transparent border-r-transparent border-t-transparent text-stone-500 hover:text-stone-600']"
                             @click="activeIde = ide.id"
                           >
-                            <component :is="ide.icon" class="h-3.5 w-3.5" />
+                            <svg width="14" height="14" :viewBox="ide.viewBox" :fill="activeIde === ide.id ? ide.color : 'currentColor'" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5">
+                              <path :d="ide.path" />
+                            </svg>
                             {{ ide.label }}
                           </button>
                           <div class="flex-grow border-b border-stone-300"></div>
                         </div>
                       </div>
-                    </div>
-
-                    <!-- Remote/Local Toggle -->
-                    <div class="flex" role="group">
-                      <button 
-                        :class="['border px-3 py-1 text-sm font-medium shadow-sm transition-colors rounded-l-md', 
-                          connectionType === 'remote' ? 'border-stone-500 bg-stone-700 text-white' : 'border-stone-300 bg-white text-stone-800 hover:bg-stone-50']"
-                        @click="connectionType = 'remote'"
-                      >Remote</button>
-                      <button 
-                        :class="['border px-3 py-1 text-sm font-medium shadow-sm transition-colors rounded-r-md border-l-0', 
-                          connectionType === 'local' ? 'border-stone-500 bg-stone-700 text-white' : 'border-stone-300 bg-white text-stone-800 hover:bg-stone-50']"
-                        @click="connectionType = 'local'"
-                      >Local</button>
                     </div>
 
                     <!-- Code Block -->
@@ -140,7 +130,7 @@
                           <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
                         </svg>
                       </button>
-                      <pre class="text-sm leading-relaxed text-stone-700"><code>{{ mcpConfig }}</code></pre>
+                      <pre class="text-sm leading-relaxed"><code ref="codeBlock" class="rounded"></code></pre>
                     </div>
                   </div>
                 </div>
@@ -326,9 +316,9 @@
               <div class="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10">
                 <div class="mb-6">
                   <div class="min-w-0 flex-1">
-                    <h2 class="text-lg font-semibold text-stone-900 sm:text-xl">API</h2>
+                    <h2 class="text-lg font-semibold text-stone-900 sm:text-xl">MCP</h2>
                     <div class="text-sm text-stone-500 sm:text-base">
-                      <p>Use the Context7 API to search libraries and fetch documentation programmatically</p>
+                      <p>Use MCP protocol to search libraries and fetch code snippets for AI IDE integration</p>
                     </div>
                   </div>
                 </div>
@@ -347,35 +337,62 @@
                     >Docs</button>
                   </div>
 
+                  <!-- Docs Type Toggle (仅在 Docs tab 显示) -->
+                  <div v-if="apiTab === 'docs'">
+                    <h4 class="mb-2 text-sm font-medium text-stone-700">Docs Type</h4>
+                    <div class="flex" role="group">
+                      <button 
+                        :class="['border px-3 py-1 text-sm font-medium shadow-sm transition-colors rounded-l-md', 
+                          docsType === 'code' ? 'border-stone-500 bg-stone-700 text-white' : 'border-stone-300 bg-white text-stone-800 hover:bg-stone-50']"
+                        @click="docsType = 'code'"
+                      >Code</button>
+                      <button 
+                        :class="['border px-3 py-1 text-sm font-medium shadow-sm transition-colors rounded-r-md border-l-0', 
+                          docsType === 'info' ? 'border-stone-500 bg-stone-700 text-white' : 'border-stone-300 bg-white text-stone-800 hover:bg-stone-50']"
+                        @click="docsType = 'info'"
+                      >Info</button>
+                    </div>
+                  </div>
+
                   <!-- API Code Block -->
                   <div class="relative rounded-lg bg-stone-100 p-4">
-                    <button class="absolute right-3 top-3 text-stone-400 transition-colors hover:text-stone-600">
+                    <button class="absolute right-3 top-3 text-stone-400 transition-colors hover:text-stone-600" @click="copyToClipboard(apiCommand)" aria-label="Copy code">
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
                         <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
                       </svg>
                     </button>
-                    <pre class="text-sm leading-relaxed text-stone-700"><code>{{ apiCommand }}</code></pre>
+                    <pre style="display: block; overflow-x: auto; padding: 0px; color: rgb(56, 58, 66); background: transparent; margin: 0px; font-size: 14px; line-height: 1.5;"><code ref="apiCommandBlock" class="language-bash" style="white-space: pre;"></code></pre>
                   </div>
 
                   <!-- Parameters -->
                   <div class="space-y-4">
-                    <div>
+                    <div v-if="apiTab === 'search'">
                       <h4 class="mb-2 text-sm font-medium text-stone-700">Parameters</h4>
                       <p class="text-sm text-stone-500">
-                        <code class="rounded bg-stone-100 px-1 text-xs">query</code> - Search term for finding libraries
+                        <code class="rounded bg-stone-100 px-1 text-xs">libraryName</code> - Search term for finding libraries
                       </p>
+                    </div>
+                    <div v-else>
+                      <h4 class="mb-2 text-sm font-medium text-stone-700">Parameters</h4>
+                      <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-stone-500">
+                        <div><code class="rounded bg-stone-100 px-1 text-xs">libraryId</code> - Library database ID</div>
+                        <div><code class="rounded bg-stone-100 px-1 text-xs">version</code> - Library version (optional)</div>
+                        <div><code class="rounded bg-stone-100 px-1 text-xs">topic</code> - Search by topic</div>
+                        <div><code class="rounded bg-stone-100 px-1 text-xs">mode</code> - Documentation mode (code/info)</div>
+                        <div><code class="rounded bg-stone-100 px-1 text-xs">page</code> - Page number (1-10)</div>
+                      </div>
                     </div>
                     <div>
                       <h4 class="mb-2 text-sm font-medium text-stone-700">Response</h4>
                       <div class="relative rounded-lg bg-stone-100 p-4">
-                        <button class="absolute right-3 top-3 text-stone-400 transition-colors hover:text-stone-600">
+                        <button class="absolute right-3 top-3 text-stone-400 transition-colors hover:text-stone-600" @click="copyToClipboard(apiResponse)" aria-label="Copy code">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
                             <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
                           </svg>
                         </button>
-                        <pre class="max-h-[300px] overflow-auto text-sm leading-relaxed text-stone-700"><code>{{ apiResponse }}</code></pre>
+                        <pre style="display: block; overflow-x: auto; padding: 0px; color: rgb(56, 58, 66); background: transparent; margin: 0px; font-size: 14px; line-height: 1.5;"><code ref="apiResponseBlock" class="language-json" style="white-space: pre;"></code></pre>
                       </div>
                     </div>
                   </div>
@@ -433,7 +450,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, onMounted } from 'vue'
+import { ref, computed, h, onMounted, watch, nextTick } from 'vue'
+import hljs from 'highlight.js/lib/core'
+import json from 'highlight.js/lib/languages/json'
+import bash from 'highlight.js/lib/languages/bash'
+import ini from 'highlight.js/lib/languages/ini'
+import 'highlight.js/styles/github.css'
+
+// 注册语言
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('toml', ini) // TOML 使用 ini 高亮
 import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
@@ -590,74 +617,313 @@ const loadStats = async () => {
   }
 }
 
-onMounted(() => {
-  initUserState()
-  loadAPIKeys()
-  loadStats()
-})
-
-// IDE Icons (简化版)
-const CursorIcon = {
-  render() {
-    return h('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'currentColor' }, [
-      h('path', { d: 'M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0' })
-    ])
-  }
-}
-
+// IDE 配置
 const ides = [
-  { id: 'cursor', label: 'Cursor', icon: CursorIcon },
-  { id: 'claude', label: 'Claude Code', icon: CursorIcon },
-  { id: 'vscode', label: 'VS Code', icon: CursorIcon },
-  { id: 'codex', label: 'Codex', icon: CursorIcon },
-  { id: 'windsurf', label: 'Windsurf', icon: CursorIcon },
-  { id: 'gemini', label: 'Gemini CLI', icon: CursorIcon },
-  { id: 'more', label: 'More', icon: CursorIcon }
+  { 
+    id: 'cursor', 
+    label: 'Cursor', 
+    color: '#000000',
+    viewBox: '0 0 24 24',
+    path: 'M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23'
+  },
+  { 
+    id: 'claude', 
+    label: 'Claude Code', 
+    color: '#D97757',
+    viewBox: '0 0 16 16',
+    path: 'm3.127 10.604 3.135-1.76.053-.153-.053-.085H6.11l-.525-.032-1.791-.048-1.554-.065-1.505-.08-.38-.081L0 7.832l.036-.234.32-.214.455.04 1.009.069 1.513.105 1.097.064 1.626.17h.259l.036-.105-.089-.065-.068-.064-1.566-1.062-1.695-1.121-.887-.646-.48-.327-.243-.306-.104-.67.435-.48.585.04.15.04.593.456 1.267.981 1.654 1.218.242.202.097-.068.012-.049-.109-.181-.9-1.626-.96-1.655-.428-.686-.113-.411a2 2 0 0 1-.068-.484l.496-.674L4.446 0l.662.089.279.242.411.94.666 1.48 1.033 2.014.302.597.162.553.06.17h.105v-.097l.085-1.134.157-1.392.154-1.792.052-.504.25-.605.497-.327.387.186.319.456-.045.294-.19 1.23-.37 1.93-.243 1.29h.142l.161-.16.654-.868 1.097-1.372.484-.545.565-.601.363-.287h.686l.505.751-.226.775-.707.895-.585.759-.839 1.13-.524.904.048.072.125-.012 1.897-.403 1.024-.186 1.223-.21.553.258.06.263-.218.536-1.307.323-1.533.307-2.284.54-.028.02.032.04 1.029.098.44.024h1.077l2.005.15.525.346.315.424-.053.323-.807.411-3.631-.863-.872-.218h-.12v.073l.726.71 1.331 1.202 1.667 1.55.084.383-.214.302-.226-.032-1.464-1.101-.565-.497-1.28-1.077h-.084v.113l.295.432 1.557 2.34.08.718-.112.234-.404.141-.444-.08-.911-1.28-.94-1.44-.759-1.291-.093.053-.448 4.821-.21.246-.484.186-.403-.307-.214-.496.214-.98.258-1.28.21-1.016.19-1.263.112-.42-.008-.028-.092.012-.953 1.307-1.448 1.957-1.146 1.227-.274.109-.477-.247.045-.44.266-.39 1.586-2.018.956-1.25.617-.723-.004-.105h-.036l-4.212 2.736-.75.096-.324-.302.04-.496.154-.162 1.267-.871z'
+  },
+  { 
+    id: 'vscode', 
+    label: 'VS Code', 
+    color: '#0078D4',
+    viewBox: '0 0 24 24',
+    path: 'M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z'
+  },
+  { 
+    id: 'codex', 
+    label: 'Codex', 
+    color: '#000000',
+    viewBox: '0 0 16 16',
+    path: 'M14.949 6.547a3.94 3.94 0 0 0-.348-3.273 4.11 4.11 0 0 0-4.4-1.934A4.1 4.1 0 0 0 8.423.2 4.15 4.15 0 0 0 6.305.086a4.1 4.1 0 0 0-1.891.948 4.04 4.04 0 0 0-1.158 1.753 4.1 4.1 0 0 0-1.563.679A4 4 0 0 0 .554 4.72a3.99 3.99 0 0 0 .502 4.731 3.94 3.94 0 0 0 .346 3.274 4.11 4.11 0 0 0 4.402 1.933c.382.425.852.764 1.377.995.526.231 1.095.35 1.67.346 1.78.002 3.358-1.132 3.901-2.804a4.1 4.1 0 0 0 1.563-.68 4 4 0 0 0 1.14-1.253 3.99 3.99 0 0 0-.506-4.716m-6.097 8.406a3.05 3.05 0 0 1-1.945-.694l.096-.054 3.23-1.838a.53.53 0 0 0 .265-.455v-4.49l1.366.778q.02.011.025.035v3.722c-.003 1.653-1.361 2.992-3.037 2.996m-6.53-2.75a2.95 2.95 0 0 1-.36-2.01l.095.057L5.29 12.09a.53.53 0 0 0 .527 0l3.949-2.246v1.555a.05.05 0 0 1-.022.041L6.473 13.3c-1.454.826-3.311.335-4.15-1.098m-.85-6.94A3.02 3.02 0 0 1 3.07 3.949v3.785a.51.51 0 0 0 .262.451l3.93 2.237-1.366.779a.05.05 0 0 1-.048 0L2.585 9.342a2.98 2.98 0 0 1-1.113-4.094zm11.216 2.571L8.747 5.576l1.362-.776a.05.05 0 0 1 .048 0l3.265 1.86a3 3 0 0 1 1.173 1.207 2.96 2.96 0 0 1-.27 3.2 3.05 3.05 0 0 1-1.36.997V8.279a.52.52 0 0 0-.276-.445m1.36-2.015-.097-.057-3.226-1.855a.53.53 0 0 0-.53 0L6.249 6.153V4.598a.04.04 0 0 1 .019-.04L9.533 2.7a3.07 3.07 0 0 1 3.257.139c.474.325.843.778 1.066 1.303.223.526.289 1.103.191 1.664zM5.503 8.575 4.139 7.8a.05.05 0 0 1-.026-.037V4.049c0-.57.166-1.127.476-1.607s.752-.864 1.275-1.105a3.08 3.08 0 0 1 3.234.41l-.096.054-3.23 1.838a.53.53 0 0 0-.265.455zm.742-1.577 1.758-1 1.762 1v2l-1.755 1-1.762-1z'
+  },
+  { 
+    id: 'windsurf', 
+    label: 'Windsurf', 
+    color: '#000000',
+    viewBox: '0 0 24 24',
+    path: 'M23.55 5.067c-1.2038-.002-2.1806.973-2.1806 2.1765v4.8676c0 .972-.8035 1.7594-1.7597 1.7594-.568 0-1.1352-.286-1.4718-.7659l-4.9713-7.1003c-.4125-.5896-1.0837-.941-1.8103-.941-1.1334 0-2.1533.9635-2.1533 2.153v4.8957c0 .972-.7969 1.7594-1.7596 1.7594-.57 0-1.1363-.286-1.4728-.7658L.4076 5.1598C.2822 4.9798 0 5.0688 0 5.2882v4.2452c0 .2147.0656.4228.1884.599l5.4748 7.8183c.3234.462.8006.8052 1.3509.9298 1.3771.313 2.6446-.747 2.6446-2.0977v-4.893c0-.972.7875-1.7593 1.7596-1.7593h.003a1.798 1.798 0 0 1 1.4718.7658l4.9723 7.0994c.4135.5905 1.05.941 1.8093.941 1.1587 0 2.1515-.9645 2.1515-2.153v-4.8948c0-.972.7875-1.7594 1.7596-1.7594h.194a.22.22 0 0 0 .2204-.2202v-4.622a.22.22 0 0 0-.2203-.2203Z'
+  },
+  { 
+    id: 'gemini', 
+    label: 'Gemini CLI', 
+    color: '#4285F4',
+    viewBox: '0 0 24 24',
+    path: 'M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81'
+  }
 ]
 const activeIde = ref('cursor')
 
-// Connection type
-const connectionType = ref('remote')
-
-// MCP Config
-const mcpConfig = computed(() => {
-  return `{
+// MCP Config - 根据不同 IDE 返回不同配置
+const mcpConfigs: Record<string, { language: string; code: string }> = {
+  cursor: {
+    language: 'json',
+    code: `{
   "mcpServers": {
-    "context7": {
-      "url": "https://mcp.context7.com/mcp",
+    "go-mcp-context": {
+      "url": "https://mcp.hsk423.cn/mcp",
       "headers": {
-        "CONTEXT7_API_KEY": "YOUR_API_KEY"
+        "Authorization": "Bearer YOUR_API_KEY"
       }
     }
   }
 }`
+  },
+  claude: {
+    language: 'bash',
+    code: `claude mcp add --transport http go-mcp-context https://mcp.hsk423.cn/mcp \\
+  --header "Authorization: Bearer YOUR_API_KEY"`
+  },
+  vscode: {
+    language: 'json',
+    code: `"mcp": {
+  "servers": {
+    "go-mcp-context": {
+      "type": "http",
+      "url": "https://mcp.hsk423.cn/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}`
+  },
+  codex: {
+    language: 'toml',
+    code: `[mcp_servers.go-mcp-context]
+url = "https://mcp.hsk423.cn/mcp"
+http_headers = { "Authorization" = "Bearer YOUR_API_KEY" }`
+  },
+  windsurf: {
+    language: 'json',
+    code: `{
+  "mcpServers": {
+    "go-mcp-context": {
+      "serverUrl": "https://mcp.hsk423.cn/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}`
+  },
+  gemini: {
+    language: 'json',
+    code: `{
+  "mcpServers": {
+    "go-mcp-context": {
+      "httpUrl": "https://mcp.hsk423.cn/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY",
+        "Accept": "application/json, text/event-stream"
+      }
+    }
+  }
+}`
+  }
+}
+
+const mcpConfig = computed(() => {
+  return mcpConfigs[activeIde.value]?.code || mcpConfigs.cursor.code
+})
+
+const mcpLanguage = computed(() => {
+  return mcpConfigs[activeIde.value]?.language || 'json'
+})
+
+// 代码块 ref
+const codeBlock = ref<HTMLElement | null>(null)
+
+// 高亮代码
+const highlightCode = () => {
+  nextTick(() => {
+    if (codeBlock.value) {
+      // 清除之前的高亮状态
+      codeBlock.value.removeAttribute('data-highlighted')
+      codeBlock.value.innerHTML = ''
+      codeBlock.value.textContent = mcpConfig.value
+      codeBlock.value.className = `language-${mcpLanguage.value} rounded`
+      hljs.highlightElement(codeBlock.value)
+    }
+  })
+}
+
+// 监听 IDE 切换，重新高亮
+watch(activeIde, highlightCode)
+
+// 初始化
+onMounted(async () => {
+  await initUserState()
+  loadAPIKeys()
+  loadStats()
+  highlightCode()
+  highlightApiCode()
 })
 
 // API Tab
 const apiTab = ref('search')
+const apiCommandBlock = ref<HTMLElement | null>(null)
+const apiResponseBlock = ref<HTMLElement | null>(null)
+const docsType = ref('code') // code 或 info
 
 const apiCommand = computed(() => {
   if (apiTab.value === 'search') {
-    return `curl -X GET "https://context7.com/api/v2/search?query=next.js" \\
-  -H "Authorization: Bearer CONTEXT7_API_KEY"`
+    return `curl -X POST "https://mcp.hsk423.cn/mcp" \\
+  -H "Content-Type: application/json" \\
+  -H "MCP_API_KEY: YOUR_API_KEY" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "search-libraries",
+      "arguments": {
+        "libraryName": "gin"
+      }
+    }
+  }'`
   }
-  return `curl -X GET "https://context7.com/api/v2/docs?id=/vercel/next.js" \\
-  -H "Authorization: Bearer CONTEXT7_API_KEY"`
+  
+  // Docs tab - 根据 docsType 构建请求
+  const mode = docsType.value
+  return `curl -X POST "https://mcp.hsk423.cn/mcp" \\
+  -H "Content-Type: application/json" \\
+  -H "MCP_API_KEY: YOUR_API_KEY" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get-library-docs",
+      "arguments": {
+        "libraryId": 6,
+        "version": "v1.9.1",
+        "topic": "routing",
+        "mode": "${mode}",
+        "page": 1
+      }
+    }
+  }'`
 })
 
 const apiResponse = computed(() => {
-  return `{
-  "results": [
-    {
-      "id": "/websites/nextjs",
-      "title": "Next.js",
-      "description": "Next.js is a React framework...",
-      "totalTokens": 1526838,
-      "totalSnippets": 7382
-    }
-  ]
+  if (apiTab.value === 'search') {
+    return `{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "libraries": [
+      {
+        "libraryId": 6,
+        "name": "gin",
+        "versions": ["v1.11.0", "v1.10.1", "v1.9.1", "v1.8.2", "v1.7.7"],
+        "defaultVersion": "latest",
+        "description": "Gin is a high-performance HTTP web framework written in Go. It provides a Martini-like API but with significantly better performance—up to 40 times faster—thanks to httprouter.",
+        "snippets": 716,
+        "score": 1
+      }
+    ]
+  }
 }`
+  }
+  
+  // Docs tab - 根据 mode 返回不同的响应示例
+  if (docsType.value === 'code') {
+    // Code 模式：包含 title, description, source, language, code（不含 content）
+    return `{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "libraryId": 6,
+    "documents": [
+      {
+        "title": "Defining Routes with Different HTTP Methods in Gin",
+        "description": "This code snippet demonstrates how to define routes for various HTTP methods using the Gin framework in Go. It includes examples for GET, POST, PUT, PATCH, DELETE, and OPTIONS requests.",
+        "source": "mcp/docs/gin/v1.9.1/docs/doc.md",
+        "language": "go",
+        "code": "func main() {\\n  router := gin.Default()\\n\\n  router.GET(\"/someGet\", getting)\\n  router.POST(\"/somePost\", posting)\\n  router.PUT(\"/somePut\", putting)\\n  router.DELETE(\"/someDelete\", deleting)\\n  router.PATCH(\"/somePatch\", patching)\\n  router.HEAD(\"/someHead\", head)\\n  router.OPTIONS(\"/someOptions\", options)\\n\\n  router.Run()\\n}",
+        "tokens": 319,
+        "relevance": 0.134
+      },
+      {
+        "title": "Grouping API Routes in Gin Framework",
+        "description": "This code snippet demonstrates how to group API routes using the Gin framework in Go. It defines two separate route groups, v1 and v2, each containing three endpoints: login, submit, and read.",
+        "source": "mcp/docs/gin/v1.9.1/docs/doc.md",
+        "language": "go",
+        "code": "func main() {\\n  router := gin.Default()\\n\\n  v1 := router.Group(\"/v1\")\\n  {\\n    v1.POST(\"/login\", loginEndpoint)\\n    v1.POST(\"/submit\", submitEndpoint)\\n    v1.POST(\"/read\", readEndpoint)\\n  }\\n\\n  v2 := router.Group(\"/v2\")\\n  {\\n    v2.POST(\"/login\", loginEndpoint)\\n    v2.POST(\"/submit\", submitEndpoint)\\n    v2.POST(\"/read\", readEndpoint)\\n  }\\n\\n  router.Run(\":8080\")\\n}",
+        "tokens": 126,
+        "relevance": 0.133
+      }
+    ],
+    "page": 1,
+    "hasMore": true
+  }
+}`
+  } else {
+    // Info 模式：只包含 title, source, content（无 description, language, code）
+    return `{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "libraryId": 6,
+    "documents": [
+      {
+        "title": "Gin Web Framework > Getting started > Installation",
+        "source": "mcp/docs/gin/v1.9.1/README.md",
+        "content": "To install Gin package, you need to install Go and set your Go workspace first.\\n\\n1. Download and install it:\\n\\n$ go get -u github.com/gin-gonic/gin\\n\\n2. Import it in your code:\\n\\nimport \\"github.com/gin-gonic/gin\\"\\n\\n3. (Optional) Import net/http. This is required for example if using constants such as http.StatusOK.",
+        "tokens": 105,
+        "relevance": 0.096
+      },
+      {
+        "title": "Gin Web Framework > Benchmarks",
+        "source": "mcp/docs/gin/v1.9.1/README.md",
+        "content": "- (1): Total Repetitions achieved in constant time, higher means more confident result\\n- (2): Single Repetition Duration (ns/op), lower is better\\n- (3): Heap Memory (B/op), lower is better\\n- (4): Average Allocations per Repetition (allocs/op), lower is better",
+        "tokens": 69,
+        "relevance": 0.091
+      }
+    ],
+    "page": 1,
+    "hasMore": true
+  }
+}`
+  }
 })
+
+// API 代码高亮
+const highlightApiCode = () => {
+  nextTick(() => {
+    // 高亮 API 命令
+    if (apiCommandBlock.value) {
+      apiCommandBlock.value.removeAttribute('data-highlighted')
+      apiCommandBlock.value.innerHTML = ''
+      apiCommandBlock.value.textContent = apiCommand.value
+      hljs.highlightElement(apiCommandBlock.value)
+    }
+    
+    // 高亮 API 响应
+    if (apiResponseBlock.value) {
+      apiResponseBlock.value.removeAttribute('data-highlighted')
+      apiResponseBlock.value.innerHTML = ''
+      apiResponseBlock.value.textContent = apiResponse.value
+      hljs.highlightElement(apiResponseBlock.value)
+    }
+  })
+}
+
+// 监听 API Tab 切换，重新高亮
+watch(apiTab, highlightApiCode)
+// 监听 Docs Type 切换，重新高亮
+watch(docsType, highlightApiCode)
 
 // Copy functions（兼容 HTTP 环境）
 const copyToClipboard = async (text: string) => {

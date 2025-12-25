@@ -22,10 +22,11 @@ type DocumentChunk struct {
 	Language    string `json:"language" gorm:"size:20"`      // 代码语言 (js, go, python, markdown)
 	Code        string `json:"code" gorm:"type:text"`        // 代码块内容（如果有）
 
-	// 原始内容和向量
-	ChunkText string          `json:"chunk_text" gorm:"type:text;not null"` // 原始文本内容
-	Tokens    int             `json:"tokens"`                               // token 数量
-	Embedding pgvector.Vector `json:"-" gorm:"type:vector(1536)"`           // 向量
+	// 原始内容、预计算 tsvector 与向量
+	ChunkText           string          `json:"chunk_text" gorm:"type:text;not null"`                // 原始文本内容
+	ChunkTSVectorSimple string          `json:"-" gorm:"column:chunk_tsvector_simple;type:tsvector"` // simple 配置预计算 tsvector
+	Tokens              int             `json:"tokens"`                                              // token 数量
+	Embedding           pgvector.Vector `json:"-" gorm:"type:vector(1536)"`                          // 向量
 
 	// 分类和统计
 	ChunkType   string `json:"chunk_type" gorm:"size:10;default:'mixed'"` // code, info, mixed

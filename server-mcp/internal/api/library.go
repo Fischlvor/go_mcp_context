@@ -86,7 +86,7 @@ func (l *LibraryApi) Update(c *gin.Context) {
 		return
 	}
 
-	var req request.LibraryCreate
+	var req request.LibraryUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.FailWithMessage("参数错误: "+err.Error(), c)
 		return
@@ -427,13 +427,15 @@ func (l *LibraryApi) InitImportFromGitHub(c *gin.Context) {
 		return
 	}
 
-	// 1. 初始化创建库（解析URL、验证连通性、检查重复、创建）
+	// 1. 初始化创建库（解析URL、验证连通性、检查重复、LLM生成库名、创建）
 	userUUID := utils.GetUUID(c).String()
-	library, defaultBranch, err := libraryService.InitFromGitHub(c.Request.Context(), req.GitHubURL, userUUID)
+	result, err := libraryService.InitFromGitHub(c.Request.Context(), req.GitHubURL, userUUID)
 	if err != nil {
 		response.FailWithMessage(err.Error(), c)
 		return
 	}
+	library := result.Library
+	defaultBranch := result.DefaultBranch
 
 	// 2. 创建根任务日志器
 	taskID := utils.GenerateTaskID()
@@ -445,8 +447,14 @@ func (l *LibraryApi) InitImportFromGitHub(c *gin.Context) {
 		InfoStartSync(actlog.EventGHImportStart, fmt.Sprintf("开始导入: %s@latest", library.SourceURL))
 
 	// 4. 记录库创建日志
-	rootLogger.WithTarget("library", fmt.Sprintf("%d", library.ID)).
-		Info(actlog.EventLibCreate, fmt.Sprintf("从 GitHub 创建库: %s", library.Name))
+	if result.LLMTitle != "" {
+		// LLM 生成了库名
+		rootLogger.WithTarget("library", fmt.Sprintf("%d", library.ID)).
+			Info(actlog.EventLibCreate, fmt.Sprintf("从 GitHub 创建库: %s (LLM: %s → %s)", library.Name, result.RepoName, result.LLMTitle))
+	} else {
+		rootLogger.WithTarget("library", fmt.Sprintf("%d", library.ID)).
+			Info(actlog.EventLibCreate, fmt.Sprintf("从 GitHub 创建库: %s", library.Name))
+	}
 
 	// 5. 异步导入（使用默认分支，版本名为 latest，传递 taskID）
 	githubService := service.NewGitHubImportService()

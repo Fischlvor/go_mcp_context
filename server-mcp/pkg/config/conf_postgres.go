@@ -18,6 +18,7 @@ type Postgres struct {
 	MaxIdleConns int    `json:"max_idle_conns" yaml:"max_idle_conns"` // 最大空闲连接数
 	MaxOpenConns int    `json:"max_open_conns" yaml:"max_open_conns"` // 最大打开连接数
 	LogMode      string `json:"log_mode" yaml:"log_mode"`             // 日志模式
+	GormLogFile  string `json:"gorm_log_file" yaml:"gorm_log_file"`   // GORM 日志输出文件
 }
 
 // Dsn 返回数据库连接字符串

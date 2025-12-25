@@ -214,18 +214,6 @@
             <label class="block text-sm font-medium text-stone-700 mb-1">Description</label>
             <textarea v-model="form.description" rows="3" class="w-full px-3 py-2 rounded-lg border border-stone-300 text-sm resize-none focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" placeholder="Brief description of the library"></textarea>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-stone-700 mb-1">Source Type</label>
-            <select v-model="form.source_type" class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600">
-              <option value="local">Local Upload</option>
-              <option value="github">GitHub</option>
-              <option value="website">Website</option>
-            </select>
-          </div>
-          <div v-if="form.source_type !== 'local'">
-            <label class="block text-sm font-medium text-stone-700 mb-1">Source URL</label>
-            <input v-model="form.source_url" type="text" class="w-full h-10 px-3 rounded-lg border border-stone-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600" :placeholder="form.source_type === 'github' ? 'e.g. vuejs/docs' : 'e.g. vuejs.org/guide'" />
-          </div>
         </div>
         <div class="flex justify-end gap-3 border-t border-stone-200 px-6 py-4">
           <button class="h-10 px-4 rounded-lg border border-stone-300 text-sm font-medium text-stone-700 hover:bg-stone-50" @click="dialogVisible = false">Cancel</button>
@@ -294,9 +282,7 @@ const openDropdownId = ref<number | null>(null)
 
 const form = reactive({
   name: '',
-  description: '',
-  source_type: 'local',
-  source_url: ''
+  description: ''
 })
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -342,8 +328,6 @@ const showAddDialog = () => {
   editId.value = null
   form.name = ''
   form.description = ''
-  form.source_type = 'local'
-  form.source_url = ''
   dialogVisible.value = true
 }
 
@@ -352,8 +336,6 @@ const handleEdit = (lib: LibraryListItem) => {
   editId.value = lib.id
   form.name = lib.name
   form.description = ''  // 列表项没有 description，需要从详情获取
-  form.source_type = lib.source_type
-  form.source_url = lib.source_url
   openDropdownId.value = null
   dialogVisible.value = true
 }
@@ -384,7 +366,8 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     if (isEdit.value && editId.value) {
-      await updateLibrary(editId.value, form)
+      // 更新只传 name 和 description
+      await updateLibrary(editId.value, { name: form.name, description: form.description })
       ElMessage.success('Library updated')
     } else {
       await createLibrary(form)
