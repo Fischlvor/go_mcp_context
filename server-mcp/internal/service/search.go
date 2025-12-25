@@ -72,8 +72,8 @@ func (s *SearchService) SearchDocuments(req *request.Search) (*response.SearchRe
 	if limit <= 0 {
 		limit = 10
 	}
-	if limit > 50 {
-		limit = 50
+	if limit > 10 {
+		limit = 10
 	}
 
 	// 拆分 topic（支持逗号、空格分隔）
@@ -113,20 +113,25 @@ func (s *SearchService) SearchDocuments(req *request.Search) (*response.SearchRe
 	results := make([]response.SearchResultItem, 0, end-start)
 	chunkIDs := make([]uint, 0, end-start)
 	for _, c := range candidates[start:end] {
-		results = append(results, response.SearchResultItem{
+		item := response.SearchResultItem{
 			ChunkID:     c.Chunk.ID,
 			UploadID:    c.Chunk.UploadID,
 			LibraryID:   c.Chunk.LibraryID,
 			Version:     c.Chunk.Version,
+			Mode:        c.Chunk.ChunkType,   // code 或 info
 			Title:       c.Chunk.Title,       // code mode: LLM 生成, info mode: headers 层级
 			Description: c.Chunk.Description, // code mode: LLM 生成, info mode: 空
 			Source:      c.Chunk.Source,
 			Language:    c.Chunk.Language, // code mode: 代码语言, info mode: 空
 			Code:        c.Chunk.Code,     // code mode: 代码内容, info mode: 空
-			Content:     c.Chunk.ChunkText,
 			Tokens:      c.Chunk.Tokens,
 			Relevance:   c.FinalScore,
-		})
+		}
+		// info 类型的块返回 content（chunk_text）
+		if c.Chunk.ChunkType == "info" {
+			item.Content = c.Chunk.ChunkText
+		}
+		results = append(results, item)
 		chunkIDs = append(chunkIDs, c.Chunk.ID)
 	}
 
@@ -156,17 +161,12 @@ func (s *SearchService) vectorSearch(ctx context.Context, libraryID uint, queryV
 		DocTitle string  `gorm:"column:doc_title"`
 	}
 
-	query := global.DB.Table("document_chunks").
+	query := global.DB.Model(&dbmodel.DocumentChunk{}).
 		Select("document_chunks.*, document_uploads.title as doc_title, embedding <=> ? as distance", pgvector.NewVector(queryVector)).
 		Joins("LEFT JOIN document_uploads ON document_uploads.id = document_chunks.upload_id").
-		Where("document_chunks.library_id = ? AND document_chunks.status = ?", libraryID, "active").
-		Order("distance ASC").
-		Limit(limit)
-
-	// 版本过滤
-	if version != "" {
-		query = query.Where("document_chunks.version = ?", version)
-	}
+		Where("document_chunks.status = ? AND document_chunks.deleted_at IS NULL", "active").
+		Where("document_chunks.library_id = ?", libraryID).
+		Where("document_chunks.version = ?", version)
 
 	// mode 过滤：code 搜索 code 类型，info 搜索 info 类型
 	if mode == "code" {
@@ -174,6 +174,10 @@ func (s *SearchService) vectorSearch(ctx context.Context, libraryID uint, queryV
 	} else if mode == "info" {
 		query = query.Where("document_chunks.chunk_type = ?", "info")
 	}
+
+	query = query.
+		Order("distance ASC").
+		Limit(limit)
 
 	if err := query.Find(&chunks).Error; err != nil {
 		return nil, err
@@ -205,18 +209,15 @@ func (s *SearchService) bm25Search(ctx context.Context, libraryID uint, query st
 	}
 
 	// 使用 PostgreSQL 全文搜索
-	sqlQuery := global.DB.Table("document_chunks").
-		Select("document_chunks.*, document_uploads.title as doc_title, ts_rank(to_tsvector('simple', chunk_text), plainto_tsquery('simple', ?)) as rank", query).
+	sqlQuery := global.DB.Model(&dbmodel.DocumentChunk{}).
+		Select("document_chunks.*, document_uploads.title as doc_title, ts_rank(document_chunks.chunk_tsvector_simple, plainto_tsquery('simple', ?)) as rank", query).
 		Joins("LEFT JOIN document_uploads ON document_uploads.id = document_chunks.upload_id").
-		Where("document_chunks.library_id = ? AND document_chunks.status = ?", libraryID, "active").
-		Where("to_tsvector('simple', chunk_text) @@ plainto_tsquery('simple', ?)", query).
+		Where("document_chunks.status = ? AND document_chunks.deleted_at IS NULL", "active").
+		Where("document_chunks.library_id = ?", libraryID).
+		Where("document_chunks.version = ?", version).
+		Where("document_chunks.chunk_tsvector_simple @@ plainto_tsquery('simple', ?)", query).
 		Order("rank DESC").
 		Limit(limit)
-
-	// 版本过滤
-	if version != "" {
-		sqlQuery = sqlQuery.Where("document_chunks.version = ?", version)
-	}
 
 	// mode 过滤：code 搜索 code 类型，info 搜索 info 类型
 	if mode == "code" {
@@ -327,34 +328,17 @@ func extractDeepestTitle(metadata dbmodel.JSON) string {
 	return ""
 }
 
-// splitTopics 拆分 topic 字符串（支持逗号、空格分隔）
+// splitTopics 拆分 topic 字符串（按逗号分隔）
+// 例如 "data fetching, routing" -> ["data fetching", "routing"]
 func splitTopics(query string) []string {
-	// 先用逗号分割
 	parts := strings.Split(query, ",")
 	var topics []string
 
 	for _, part := range parts {
-		// 去除首尾空格
 		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
+		if part != "" {
+			topics = append(topics, part)
 		}
-
-		// 如果包含空格，进一步分割（但保留短语）
-		// 这里只按逗号分割，空格作为短语的一部分
-		// 例如 "data fetching, routing" -> ["data fetching", "routing"]
-		topics = append(topics, part)
-	}
-
-	// 如果没有逗号，尝试用空格分割（单词级别）
-	if len(topics) == 1 && strings.Contains(topics[0], " ") {
-		// 检查是否是多个独立单词（如 "routing middleware"）
-		words := strings.Fields(topics[0])
-		if len(words) >= 2 && len(words) <= 5 {
-			// 2-5 个单词，可能是多个 topic
-			topics = words
-		}
-		// 否则保持原样（可能是一个长短语）
 	}
 
 	return topics

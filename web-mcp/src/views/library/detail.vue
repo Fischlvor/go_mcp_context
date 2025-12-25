@@ -257,7 +257,10 @@
           <!-- Terminal 日志面板 -->
           <div v-if="activeTab === 'logs'" class="mt-8">
             <div class="rounded-xl bg-stone-800 p-6 shadow-sm">
-              <div class="h-[360px] overflow-y-auto font-mono text-sm text-stone-50 [scrollbar-color:theme(colors.stone.400)_theme(colors.stone.800)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-400 [&::-webkit-scrollbar-track]:bg-stone-800 [&::-webkit-scrollbar]:w-2">
+              <div 
+                ref="logContainerRef"
+                class="h-[360px] overflow-y-auto font-mono text-sm text-stone-50 [scrollbar-color:theme(colors.stone.400)_theme(colors.stone.800)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-400 [&::-webkit-scrollbar-track]:bg-stone-800 [&::-webkit-scrollbar]:w-2"
+                @scroll="handleLogScroll">
                 <div v-if="activityLogs.length === 0" class="text-stone-400">
                   No activity logs yet. Logs will appear here when you perform actions like importing documents or refreshing content.
                 </div>
@@ -507,7 +510,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppHeader from '@/components/AppHeader.vue'
@@ -576,6 +579,8 @@ const refreshingVersion = ref(false)
 const loadingLogs = ref(false)
 const activityLogs = ref<ActivityLog[]>([])
 const logPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const logContainerRef = ref<HTMLElement | null>(null)
+const autoScrollLogs = ref(true) // 是否自动滚动到底部
 
 // 从 API 获取日志
 const fetchLogs = async () => {
@@ -591,6 +596,11 @@ const fetchLogs = async () => {
     if (res.status === 'complete') {
       stopLogPolling()
     }
+    
+    // 自动滚动到底部
+    if (autoScrollLogs.value) {
+      scrollLogsToBottom()
+    }
   } catch (error) {
     console.error('Failed to fetch logs:', error)
   } finally {
@@ -598,10 +608,30 @@ const fetchLogs = async () => {
   }
 }
 
+// 滚动日志到底部
+const scrollLogsToBottom = () => {
+  nextTick(() => {
+    if (logContainerRef.value) {
+      logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight
+    }
+  })
+}
+
+// 处理日志滚动事件
+const handleLogScroll = () => {
+  if (!logContainerRef.value) return
+  const { scrollTop, scrollHeight, clientHeight } = logContainerRef.value
+  // 如果滚动到底部（误差 10px），启用自动滚动
+  // 如果向上滚动，禁用自动滚动
+  autoScrollLogs.value = scrollHeight - scrollTop - clientHeight < 10
+}
+
 // 开始轮询日志
 const startLogPolling = () => {
   // 先停止已有的轮询
   stopLogPolling()
+  // 重置自动滚动状态
+  autoScrollLogs.value = true
   // 立即请求一次
   fetchLogs()
   // 每 2 秒轮询一次

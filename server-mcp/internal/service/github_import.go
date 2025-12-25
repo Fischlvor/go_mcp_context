@@ -118,6 +118,8 @@ func (s *GitHubImportService) ImportFromGitHub(ctx context.Context, libraryID ui
 		WithTarget("version", version).
 		WithActor(actorID)
 
+	actLogger.Info(actlog.EventGHImportDownload, fmt.Sprintf("找到 %d 个文档文件", len(files)))
+
 	// 5.1 检查版本是否已存在
 	versionExists := false
 	for _, v := range library.Versions {
@@ -348,7 +350,7 @@ func (s *GitHubImportService) processFile(
 	// 同步处理文档，并推送处理状态
 	statusChan := make(chan response.ProcessStatus, 10)
 	docLogger := actLogger.WithTarget("document", strconv.FormatUint(uint64(doc.ID), 10))
-	go processor.ProcessDocumentWithCallback(doc, content, statusChan, docLogger)
+	go processor.ProcessDocumentWithCallback(doc, content, statusChan, docLogger, false) // GitHub 导入是中间步骤
 
 	// 转发处理状态到 progressChan
 	processingFailed := false

@@ -1,22 +1,16 @@
 package request
 
-// LibraryCreate 创建库请求
+// LibraryCreate 创建库请求（Local 类型）
 type LibraryCreate struct {
-	Name           string `json:"name" binding:"required"`
-	Description    string `json:"description"`
-	SourceType     string `json:"source_type"`     // github, website, local（默认 local）
-	SourceURL      string `json:"source_url"`      // vuejs/docs 或 vuejs.org/guide
-	DefaultVersion string `json:"default_version"` // 默认版本（默认 default）
-	CreatedBy      string `json:"-"`               // 创建者 UUID（从 JWT 获取，不从请求体读取）
-}
-
-// LibraryUpdate 更新库请求
-type LibraryUpdate struct {
-	ID          uint   `json:"id" binding:"required"`
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
-	SourceType  string `json:"source_type"`
-	SourceURL   string `json:"source_url"`
+	CreatedBy   string `json:"-"` // 创建者 UUID（从 JWT 获取，不从请求体读取）
+}
+
+// LibraryUpdate 更新库请求（ID 从 URL 路径获取）
+type LibraryUpdate struct {
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description"`
 }
 
 // LibraryList 库列表请求

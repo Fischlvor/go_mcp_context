@@ -14,6 +14,7 @@
     "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.11.0",
     "element-plus": "^2.10.7",
+    "highlight.js": "^11.11.1",
     "pinia": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "vue": "^3.5.13",

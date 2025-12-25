@@ -48,9 +48,14 @@ type MCPGetLibraryDocsResult struct {
 
 // MCPDocumentChunk 文档片段
 type MCPDocumentChunk struct {
-	Title     string  `json:"title"`     // 标题（从 Metadata 提取）
-	Source    string  `json:"source"`    // 来源文档标题
-	Content   string  `json:"content"`   // 内容
-	Tokens    int     `json:"tokens"`    // token 数
-	Relevance float64 `json:"relevance"` // 相关性分数 0-1
+	Title       string  `json:"title"`                 // 标题（code mode: LLM 生成, info mode: headers 层级）
+	Description string  `json:"description,omitempty"` // LLM 生成的描述（仅 code mode）
+	Source      string  `json:"source"`                // 来源文件路径
+	Version     string  `json:"version"`               // 版本号
+	Mode        string  `json:"mode"`                  // 类型：code 或 info
+	Language    string  `json:"language,omitempty"`    // 代码语言（仅 code mode）
+	Code        string  `json:"code,omitempty"`        // 代码内容（仅 code mode）
+	Content     string  `json:"content,omitempty"`     // ChunkText 原文（仅 info mode）
+	Tokens      int     `json:"tokens"`                // token 数
+	Relevance   float64 `json:"relevance"`             // 相关性分数 0-1
 }

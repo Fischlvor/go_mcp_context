@@ -15,6 +15,7 @@ type SearchResultItem struct {
 	UploadID    uint    `json:"upload_id"`
 	LibraryID   uint    `json:"library_id"`
 	Version     string  `json:"version"`     // 文档版本
+	Mode        string  `json:"mode"`        // 类型：code 或 info
 	Title       string  `json:"title"`       // LLM 生成的标题（code mode）或 headers 层级（info mode）
 	Description string  `json:"description"` // LLM 生成的描述（code mode），info mode 为空
 	Source      string  `json:"source"`      // 文件来源路径
