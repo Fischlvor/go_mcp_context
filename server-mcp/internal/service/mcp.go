@@ -97,23 +97,10 @@ func (s *MCPService) SearchLibraries(req *request.MCPSearchLibraries) (*response
 }
 
 // GetLibraryDocs 获取库文档（MCP 工具）
+// 支持两种模式：
+// 1. 指定 libraryID：在特定库中搜索
+// 2. 不指定 libraryID（为 0）：全局搜索所有库
 func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.MCPGetLibraryDocsResult, error) {
-	// 根据 libraryID 查找库
-	libraryService := &LibraryService{}
-	library, err := libraryService.GetByID(req.LibraryID)
-	if err != nil {
-		return nil, ErrNotFound
-	}
-
-	// 如果未指定版本，使用默认版本
-	version := req.Version
-	if version == "" {
-		version = library.DefaultVersion
-		if version == "" {
-			version = "latest"
-		}
-	}
-
 	// 分页参数
 	page := req.Page
 	if page < 1 || page > 10 {
@@ -121,68 +108,62 @@ func (s *MCPService) GetLibraryDocs(req *request.MCPGetLibraryDocs) (*response.M
 	}
 	limit := 10 // MCP 每页固定 10 条
 
-	// 如果有 topic，执行混合搜索
-	if req.Topic != "" {
-		searchResult, err := s.searchService.SearchDocuments(&request.Search{
-			LibraryID: library.ID,
-			Query:     req.Topic,
-			Mode:      req.Mode,
-			Version:   version,
-			Page:      page,
-			Limit:     limit,
-		})
+	version := req.Version
+
+	// 如果指定了 libraryID，验证库是否存在
+	var libraryID uint
+	if req.LibraryID > 0 {
+		libraryService := &LibraryService{}
+		library, err := libraryService.GetByID(req.LibraryID)
 		if err != nil {
-			return nil, err
+			return nil, ErrNotFound
 		}
-
-		documents := make([]response.MCPDocumentChunk, 0, len(searchResult.Results))
-		for _, r := range searchResult.Results {
-			documents = append(documents, response.MCPDocumentChunk{
-				Title:     r.Title,
-				Source:    r.Source,
-				Content:   r.Content,
-				Tokens:    r.Tokens,
-				Relevance: r.Relevance,
-			})
-		}
-
-		// 统计 MCP 调用
-		stats.IncrementWithLibrary(library.ID, dbmodel.MetricMCPGetLibraryDocs, 1)
-
-		return &response.MCPGetLibraryDocsResult{
-			LibraryID: library.ID,
-			Documents: documents,
-			Page:      page,
-			HasMore:   searchResult.HasMore,
-		}, nil
+		libraryID = library.ID
 	}
 
-	// 没有 topic，返回库的所有文档块（按热度排序）
-	documentService := &DocumentService{}
-	chunks, total, err := documentService.GetChunksByLibrary(library.ID, req.Mode, version, page, limit)
+	// 执行搜索（libraryID 为 0 时全局搜索）
+	searchResult, err := s.searchService.SearchDocuments(&request.Search{
+		LibraryID: libraryID, // 0 表示全局搜索
+		Query:     req.Topic,
+		Mode:      req.Mode,
+		Version:   version,
+		Page:      page,
+		Limit:     limit,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	documents := make([]response.MCPDocumentChunk, 0, len(chunks))
-	for _, chunk := range chunks {
-		documents = append(documents, response.MCPDocumentChunk{
-			Title:     extractDeepestTitle(chunk.Metadata),
-			Source:    "", // 无搜索时暂不获取文档标题
-			Content:   chunk.ChunkText,
-			Tokens:    chunk.Tokens,
-			Relevance: 1.0, // 无搜索时默认分数
-		})
+	documents := make([]response.MCPDocumentChunk, 0, len(searchResult.Results))
+	for _, r := range searchResult.Results {
+		doc := response.MCPDocumentChunk{
+			Title:       r.Title,
+			Description: r.Description, // code mode 有值，info mode 为空
+			Source:      r.Source,
+			Version:     r.Version,
+			Mode:        r.Mode,
+			Language:    r.Language, // code mode 有值，info mode 为空
+			Code:        r.Code,     // code mode 有值，info mode 为空
+			Tokens:      r.Tokens,
+			Relevance:   r.Relevance,
+		}
+		// info 模式才返回 content（chunk_text）
+		if r.Mode == "info" {
+			doc.Content = r.Content
+		}
+		documents = append(documents, doc)
 	}
 
-	// 统计 MCP 调用
-	stats.IncrementWithLibrary(library.ID, dbmodel.MetricMCPGetLibraryDocs, 1)
+	// 统计 MCP 调用（如果有指定库）
+	if libraryID > 0 {
+		stats.IncrementWithLibrary(libraryID, dbmodel.MetricMCPGetLibraryDocs, 1)
+	}
 
 	return &response.MCPGetLibraryDocsResult{
-		LibraryID: library.ID,
+		LibraryID: libraryID,
 		Documents: documents,
 		Page:      page,
-		HasMore:   int64(page*limit) < total,
+		HasMore:   searchResult.HasMore,
 	}, nil
 }
 

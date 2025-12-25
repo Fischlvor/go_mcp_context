@@ -15,6 +15,7 @@ postgres:
   max_idle_conns: 10
   max_open_conns: 100
   log_mode: info
+  gorm_log_file: log/gorm.log
 
 redis:
   address: localhost:6379

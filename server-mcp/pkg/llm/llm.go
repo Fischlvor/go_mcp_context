@@ -10,6 +10,8 @@ type LLMService interface {
 	Enrich(ctx context.Context, input EnrichInput) (*EnrichOutput, error)
 	// Chat 通用对话（预留）
 	Chat(ctx context.Context, prompt string) (string, error)
+	// GenerateLibraryTitle 为库生成简短友好的名称
+	GenerateLibraryTitle(ctx context.Context, repoName, description string) (string, error)
 }
 
 // EnrichInput Enrich 输入

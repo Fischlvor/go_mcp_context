@@ -198,6 +198,8 @@ func (d *DocumentApi) GetChunks(c *gin.Context) {
 	// 获取 topic 参数（可选）
 	topic := c.Query("topic")
 
+	limit := 10
+
 	// 如果有 topic，进行向量搜索
 	if topic != "" {
 		global.Log.Info("GetChunks: 执行向量搜索",
@@ -213,7 +215,7 @@ func (d *DocumentApi) GetChunks(c *gin.Context) {
 			Mode:      mode,
 			Version:   version, // 传入版本参数
 			Page:      1,
-			Limit:     50, // 搜索返回更多结果
+			Limit:     limit, // 前端详情页返回 10 条
 		})
 		if err != nil {
 			global.Log.Error("GetChunks: 搜索失败", zap.Error(err))
@@ -249,8 +251,8 @@ func (d *DocumentApi) GetChunks(c *gin.Context) {
 		return
 	}
 
-	// 无 topic，返回全部文档块（最小所需字段）
-	dbChunks, err := documentService.GetChunks(uint(libraryID), version, mode)
+	// 无 topic，返回文档块（受 limit 限制）
+	dbChunks, err := documentService.GetChunks(uint(libraryID), version, mode, limit)
 	if err != nil {
 		response.OkWithData(gin.H{
 			"chunks": []interface{}{},

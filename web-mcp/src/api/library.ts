@@ -39,11 +39,16 @@ export interface LibraryListResponse {
   page_size: number
 }
 
+// 创建库请求（Local 类型）
 export interface LibraryCreateRequest {
   name: string
   description?: string
-  source_type?: string  // github, website, local
-  source_url?: string   // vuejs/docs
+}
+
+// 更新库请求（只能修改 name 和 description）
+export interface LibraryUpdateRequest {
+  name: string
+  description?: string
 }
 
 // 活动日志
@@ -89,7 +94,7 @@ export const getLibrary = (id: number): Promise<Library> => {
 }
 
 // 更新库
-export const updateLibrary = (id: number, data: LibraryCreateRequest): Promise<Library> => {
+export const updateLibrary = (id: number, data: LibraryUpdateRequest): Promise<Library> => {
   return service({
     url: `/libraries/${id}`,
     method: 'put',
