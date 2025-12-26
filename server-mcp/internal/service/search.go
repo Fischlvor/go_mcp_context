@@ -39,11 +39,11 @@ func (s *SearchService) InvalidateLibraryCache(libraryID uint, version string) e
 	return global.Cache.InvalidateTags([]string{tag})
 }
 
-// 重排序权重
+// 混合搜索权重 - 使用RRF算法
 const (
-	VectorWeight = 0.5 // 向量相似度权重
-	BM25Weight   = 0.3 // BM25 权重
-	HotWeight    = 0.2 // 热度权重
+	VectorRRFWeight = 0.7 // 向量搜索RRF权重
+	BM25RRFWeight   = 0.3 // BM25搜索RRF权重
+	HotWeight       = 0.2 // 热度权重（保持不变）
 
 	// RRF 常量
 	RRFConstant = 60 // Elasticsearch 默认值，较高值让低排名文档也有影响力
@@ -83,7 +83,7 @@ func (s *SearchService) SearchDocuments(req *request.Search) (*response.SearchRe
 	var err error
 
 	if len(topics) <= 1 {
-		// 单个 topic，使用原有逻辑
+		// 单个 topic，使用混合RRF搜索
 		candidates, err = s.searchSingleTopic(ctx, req, req.Query)
 	} else {
 		// 多个 topic，并行搜索 + RRF 合并
@@ -242,71 +242,14 @@ func (s *SearchService) bm25Search(ctx context.Context, libraryID uint, query st
 	return results, nil
 }
 
-// mergeAndRerank 合并去重并重排序
+// mergeAndRerank 合并去重并重排序 - 使用RRF算法
 func (s *SearchService) mergeAndRerank(vectorResults, bm25Results []searchCandidate) []searchCandidate {
-	// 用 map 合并去重
-	candidateMap := make(map[uint]*searchCandidate)
+	// 对得分进行归一化（可选，RRF主要基于排名）
+	s.normalizeScoresMinMax(vectorResults, "vector")
+	s.normalizeScoresMinMax(bm25Results, "bm25")
 
-	// 获取最大热度用于归一化
-	var maxAccessCount int
-	for _, c := range vectorResults {
-		if c.Chunk.AccessCount > maxAccessCount {
-			maxAccessCount = c.Chunk.AccessCount
-		}
-	}
-	for _, c := range bm25Results {
-		if c.Chunk.AccessCount > maxAccessCount {
-			maxAccessCount = c.Chunk.AccessCount
-		}
-	}
-	if maxAccessCount == 0 {
-		maxAccessCount = 1 // 避免除零
-	}
-
-	// 合并向量搜索结果
-	for _, c := range vectorResults {
-		candidate := c
-		candidate.HotScore = float64(c.Chunk.AccessCount) / float64(maxAccessCount)
-		candidateMap[c.Chunk.ID] = &candidate
-	}
-
-	// 合并 BM25 结果
-	for _, c := range bm25Results {
-		if existing, ok := candidateMap[c.Chunk.ID]; ok {
-			existing.BM25Score = c.BM25Score
-		} else {
-			candidate := c
-			candidate.HotScore = float64(c.Chunk.AccessCount) / float64(maxAccessCount)
-			candidateMap[c.Chunk.ID] = &candidate
-		}
-	}
-
-	// 归一化 BM25 分数
-	var maxBM25 float64
-	for _, c := range candidateMap {
-		if c.BM25Score > maxBM25 {
-			maxBM25 = c.BM25Score
-		}
-	}
-	if maxBM25 > 0 {
-		for _, c := range candidateMap {
-			c.BM25Score = c.BM25Score / maxBM25
-		}
-	}
-
-	// 计算最终分数
-	candidates := make([]searchCandidate, 0, len(candidateMap))
-	for _, c := range candidateMap {
-		c.FinalScore = VectorWeight*c.VectorScore + BM25Weight*c.BM25Score + HotWeight*c.HotScore
-		candidates = append(candidates, *c)
-	}
-
-	// 按最终分数降序排序
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].FinalScore > candidates[j].FinalScore
-	})
-
-	return candidates
+	// 使用RRF算法合并结果
+	return s.hybridRRF(vectorResults, bm25Results)
 }
 
 // extractDeepestTitle 从 Metadata 提取最深层级的标题
@@ -404,6 +347,133 @@ func (s *SearchService) buildSearchCacheKey(libraryID uint, version, mode, topic
 // 用于在库版本更新时批量失效相关缓存
 func (s *SearchService) buildSearchCacheTag(libraryID uint, version string) string {
 	return fmt.Sprintf("library:%d:%s", libraryID, version)
+}
+
+// normalizeScoresMinMax Min-Max归一化得分到[0,1]范围
+func (s *SearchService) normalizeScoresMinMax(candidates []searchCandidate, scoreField string) {
+	if len(candidates) == 0 {
+		return
+	}
+
+	// 找出最大值和最小值
+	var minScore, maxScore float64
+	for i, candidate := range candidates {
+		var score float64
+		switch scoreField {
+		case "vector":
+			score = candidate.VectorScore
+		case "bm25":
+			score = candidate.BM25Score
+		default:
+			continue
+		}
+
+		if i == 0 {
+			minScore, maxScore = score, score
+		} else {
+			if score < minScore {
+				minScore = score
+			}
+			if score > maxScore {
+				maxScore = score
+			}
+		}
+	}
+
+	// 避免除零
+	if maxScore == minScore {
+		return
+	}
+
+	// 归一化
+	for i := range candidates {
+		var score *float64
+		switch scoreField {
+		case "vector":
+			score = &candidates[i].VectorScore
+		case "bm25":
+			score = &candidates[i].BM25Score
+		default:
+			continue
+		}
+		*score = (*score - minScore) / (maxScore - minScore)
+	}
+}
+
+// hybridRRF 使用RRF算法合并向量搜索和BM25搜索结果
+func (s *SearchService) hybridRRF(vectorResults, bm25Results []searchCandidate) []searchCandidate {
+	// 构建排名映射
+	vectorRanks := make(map[uint]int)
+	bm25Ranks := make(map[uint]int)
+
+	for rank, candidate := range vectorResults {
+		vectorRanks[candidate.Chunk.ID] = rank + 1 // 排名从1开始
+	}
+
+	for rank, candidate := range bm25Results {
+		bm25Ranks[candidate.Chunk.ID] = rank + 1 // 排名从1开始
+	}
+
+	// 收集所有候选文档
+	candidateMap := make(map[uint]*searchCandidate)
+
+	// 处理向量搜索结果
+	for _, candidate := range vectorResults {
+		c := candidate
+		candidateMap[c.Chunk.ID] = &c
+	}
+
+	// 处理BM25搜索结果
+	for _, candidate := range bm25Results {
+		if existing, ok := candidateMap[candidate.Chunk.ID]; ok {
+			existing.BM25Score = candidate.BM25Score
+		} else {
+			c := candidate
+			candidateMap[c.Chunk.ID] = &c
+		}
+	}
+
+	// 计算热度归一化
+	var maxAccessCount int
+	for _, c := range candidateMap {
+		if c.Chunk.AccessCount > maxAccessCount {
+			maxAccessCount = c.Chunk.AccessCount
+		}
+	}
+	if maxAccessCount == 0 {
+		maxAccessCount = 1
+	}
+
+	// 计算RRF分数
+	candidates := make([]searchCandidate, 0, len(candidateMap))
+	for _, candidate := range candidateMap {
+		rrfScore := 0.0
+
+		// 向量搜索贡献
+		if rank, exists := vectorRanks[candidate.Chunk.ID]; exists {
+			rrfScore += VectorRRFWeight / (float64(rank) + float64(RRFConstant))
+		}
+
+		// BM25搜索贡献
+		if rank, exists := bm25Ranks[candidate.Chunk.ID]; exists {
+			rrfScore += BM25RRFWeight / (float64(rank) + float64(RRFConstant))
+		}
+
+		// 热度贡献
+		hotScore := float64(candidate.Chunk.AccessCount) / float64(maxAccessCount)
+		rrfScore += HotWeight * hotScore
+
+		candidate.FinalScore = rrfScore
+		candidate.HotScore = hotScore
+		candidates = append(candidates, *candidate)
+	}
+
+	// 按RRF分数降序排序
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].FinalScore > candidates[j].FinalScore
+	})
+
+	return candidates
 }
 
 // searchMultiTopicsWithRRF 多 topic 并行搜索 + RRF 合并
