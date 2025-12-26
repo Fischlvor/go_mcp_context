@@ -10,6 +10,7 @@ import (
 type SearchApi struct{}
 
 // Search 搜索文档
+// 注意：此API暂时不使用，前端目前通过 /documents/chunks API 实现搜索功能
 func (s *SearchApi) Search(c *gin.Context) {
 	var req request.Search
 	if err := c.ShouldBindJSON(&req); err != nil {
