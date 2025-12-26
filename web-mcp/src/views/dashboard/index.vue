@@ -673,7 +673,7 @@ const mcpConfigs: Record<string, { language: string; code: string }> = {
     "go-mcp-context": {
       "url": "https://mcp.hsk423.cn/mcp",
       "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+        "MCP_API_KEY": "YOUR_API_KEY"
       }
     }
   }
@@ -682,7 +682,7 @@ const mcpConfigs: Record<string, { language: string; code: string }> = {
   claude: {
     language: 'bash',
     code: `claude mcp add --transport http go-mcp-context https://mcp.hsk423.cn/mcp \\
-  --header "Authorization: Bearer YOUR_API_KEY"`
+  --header "MCP_API_KEY: YOUR_API_KEY"`
   },
   vscode: {
     language: 'json',
@@ -692,7 +692,7 @@ const mcpConfigs: Record<string, { language: string; code: string }> = {
       "type": "http",
       "url": "https://mcp.hsk423.cn/mcp",
       "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+        "MCP_API_KEY": "YOUR_API_KEY"
       }
     }
   }
@@ -702,7 +702,7 @@ const mcpConfigs: Record<string, { language: string; code: string }> = {
     language: 'toml',
     code: `[mcp_servers.go-mcp-context]
 url = "https://mcp.hsk423.cn/mcp"
-http_headers = { "Authorization" = "Bearer YOUR_API_KEY" }`
+http_headers = { "MCP_API_KEY" = "YOUR_API_KEY" }`
   },
   windsurf: {
     language: 'json',
@@ -711,7 +711,7 @@ http_headers = { "Authorization" = "Bearer YOUR_API_KEY" }`
     "go-mcp-context": {
       "serverUrl": "https://mcp.hsk423.cn/mcp",
       "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+        "MCP_API_KEY": "YOUR_API_KEY"
       }
     }
   }
@@ -724,7 +724,7 @@ http_headers = { "Authorization" = "Bearer YOUR_API_KEY" }`
     "go-mcp-context": {
       "httpUrl": "https://mcp.hsk423.cn/mcp",
       "headers": {
-        "Authorization": "Bearer YOUR_API_KEY",
+        "MCP_API_KEY": "YOUR_API_KEY",
         "Accept": "application/json, text/event-stream"
       }
     }
