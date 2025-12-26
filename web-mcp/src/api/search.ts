@@ -29,6 +29,7 @@ export interface SearchRequest {
 }
 
 // 搜索文档
+// 注意：此API暂时不使用，前端目前通过 getChunks API 实现搜索功能
 export const searchDocuments = (data: SearchRequest): Promise<SearchResult> => {
   return service({
     url: '/search',
