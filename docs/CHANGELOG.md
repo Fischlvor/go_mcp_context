@@ -8,6 +8,24 @@
 
 ### Added
 
+- **Swagger/OpenAPI 文档完整实现**
+  - 为所有 24 个 REST API 端点添加完整的 Swagger 注释
+  - 配置项：`@title`、`@version`、`@description`、`@host`、`@basePath`、`@schemes`
+  - 安全定义：`JWTAuth`（Bearer Token）和 `MCP_API_KEY`（Header）
+  - API 文档覆盖：
+    - 库管理（Libraries）：8 个端点（列表、创建、详情、更新、删除、版本管理、刷新）
+    - 文档管理（Documents）：5 个端点（列表、上传、详情、文档块获取）
+    - API Key 管理（API Keys）：3 个端点（创建、列表、删除）
+    - 搜索（Search）：1 个端点
+    - 认证（Auth）：2 个端点（SSO 登录、回调）
+    - 用户（User）：1 个端点（获取用户信息）
+    - 统计（Stats）：1 个端点（获取统计数据）
+    - 活动日志（Activity Log）：1 个端点
+    - MCP：1 个端点（JSON-RPC 请求处理）
+  - 所有响应明确定义数据类型：`response.Response{data=...}`
+  - 支持环境变量控制：`APP_ENV=prod` 禁用 Swagger UI，其他环境启用
+  - Swagger UI 访问地址：`http://localhost:8090/swagger/index.html`
+
 - **MCP 协议规范化与 Costrict 集成**
   - 新增 `internal/transport/` 包：实现 HTTP、SSE、Streamable HTTP 三种传输协议的抽象层
     - `interface.go`：定义 `ResponseWriter` 和 `RequestContext` 接口
