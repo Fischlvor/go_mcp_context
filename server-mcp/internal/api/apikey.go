@@ -23,7 +23,17 @@ func getUserUUIDFromContext(c *gin.Context) uuid.UUID {
 }
 
 // Create 创建 API Key
-// POST /api/v1/api-keys/create
+// @Summary 创建 API Key
+// @Description 为当前用户创建新的 API Key，用于 MCP 协议调用（需要认证）
+// @Tags API Keys
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param data body request.APIKeyCreate true "API Key 信息"
+// @Success 200 {object} response.Response{data=response.APIKeyCreateResponse}
+// @Failure 400 {object} response.Response
+// @Failure 401 {object} response.Response
+// @Router /api/v1/api-keys/create [post]
 func (a *ApiKeyApi) Create(c *gin.Context) {
 	var req request.APIKeyCreate
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -47,7 +57,15 @@ func (a *ApiKeyApi) Create(c *gin.Context) {
 }
 
 // List 获取 API Key 列表
-// GET /api/v1/api-keys/list
+// @Summary 获取 API Key 列表
+// @Description 获取当前用户的所有 API Key（需要认证）
+// @Tags API Keys
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Success 200 {object} response.Response{data=[]response.APIKeyListItem}
+// @Failure 401 {object} response.Response
+// @Router /api/v1/api-keys/list [get]
 func (a *ApiKeyApi) List(c *gin.Context) {
 	userUUID := getUserUUIDFromContext(c)
 	if userUUID.IsNil() {
@@ -65,7 +83,17 @@ func (a *ApiKeyApi) List(c *gin.Context) {
 }
 
 // Delete 删除 API Key
-// DELETE /api/v1/api-keys/:id
+// @Summary 删除 API Key
+// @Description 删除指定的 API Key（需要认证）
+// @Tags API Keys
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param id path int true "API Key ID"
+// @Success 200 {object} response.Response{data=nil}
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/api-keys/:id [delete]
 func (a *ApiKeyApi) Delete(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)

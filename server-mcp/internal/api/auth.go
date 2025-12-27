@@ -28,7 +28,15 @@ type TokenResponse struct {
 }
 
 // GetSSOLoginURL 获取 SSO 授权地址
-// GET /api/auth/sso_login_url?redirect_uri=xxx&return_url=xxx
+// @Summary 获取 SSO 登录地址
+// @Description 获取 SSO 授权地址，用于重定向到 SSO 服务进行登录
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param redirect_uri query string false "SSO 回调地址，默认使用配置中的值"
+// @Param return_url query string false "登录后要返回的 URL，默认为 /"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/auth/sso_login_url [get]
 func (a *AuthApi) GetSSOLoginURL(c *gin.Context) {
 	// 获取回调地址
 	redirectURI := c.Query("redirect_uri")
@@ -59,7 +67,17 @@ func (a *AuthApi) GetSSOLoginURL(c *gin.Context) {
 }
 
 // SSOCallback SSO 回调接口（后端用 code 换 token）
-// GET /api/auth/callback?code=xxx&redirect_uri=xxx&state=xxx
+// @Summary SSO 登录回调
+// @Description SSO 服务回调接口，用 code 换取 token 并设置 session
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param code query string true "SSO 授权码"
+// @Param state query string false "SSO 状态参数"
+// @Param redirect_uri query string false "SSO 回调地址"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} response.Response
+// @Router /api/v1/auth/callback [get]
 func (a *AuthApi) SSOCallback(c *gin.Context) {
 	code := c.Query("code")
 	state := c.Query("state")

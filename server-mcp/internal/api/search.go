@@ -10,7 +10,15 @@ import (
 type SearchApi struct{}
 
 // Search 搜索文档
-// 注意：此API暂时不使用，前端目前通过 /documents/chunks API 实现搜索功能
+// @Summary 搜索文档
+// @Description 在指定库的指定版本中搜索文档，支持 code 和 info 两种模式，支持分页
+// @Tags Search
+// @Accept json
+// @Produce json
+// @Param data body request.Search true "搜索条件"
+// @Success 200 {object} response.Response{data=response.SearchResult}
+// @Failure 400 {object} response.Response
+// @Router /api/v1/search [post]
 func (s *SearchApi) Search(c *gin.Context) {
 	var req request.Search
 	if err := c.ShouldBindJSON(&req); err != nil {

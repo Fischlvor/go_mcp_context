@@ -16,7 +16,15 @@ import (
 type UserApi struct{}
 
 // GetUserInfo 获取当前用户信息（从 SSO 获取）
-// GET /api/v1/user/info
+// @Summary 获取用户信息
+// @Description 获取当前登录用户的信息（需要认证）
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} response.Response
+// @Router /api/v1/user/info [get]
 func (a *UserApi) GetUserInfo(c *gin.Context) {
 	// 从请求头获取 access_token
 	authHeader := c.GetHeader("Authorization")

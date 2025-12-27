@@ -1,9 +1,29 @@
+// @title go-mcp-context API
+// @version 1.0.0
+// @description 私有化文档检索服务 - 为企业内网的 AI IDE 提供实时、准确的技术文档和代码示例
+// @termsOfService http://swagger.io/terms/
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+// @host 10.21.71.19:8090
+// @basePath /
+// @schemes http https
+// @securityDefinitions.apikey MCP_API_KEY
+// @in header
+// @name MCP_API_KEY
+// @description API Key for MCP protocol calls
+// @securityDefinitions.apikey JWTAuth
+// @in header
+// @name Authorization
+// @description JWT token in the format "Bearer {token}"
 package main
 
 import (
 	"net/http"
 	"os"
 
+	_ "go-mcp-context/docs"
 	"go-mcp-context/internal/initialize"
 	"go-mcp-context/internal/middleware"
 	"go-mcp-context/pkg/core"

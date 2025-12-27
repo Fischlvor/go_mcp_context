@@ -13,9 +13,11 @@ type ActivityLogApi struct{}
 // List 获取库的活动日志
 // @Summary 获取活动日志列表
 // @Tags ActivityLog
+// @Accept json
+// @Produce json
 // @Param libraryId query int true "库ID"
 // @Param limit query int false "返回数量，默认50，最大100"
-// @Success 200 {object} response.Response
+// @Success 200 {object} response.Response{data=map[string]interface{}}
 // @Router /api/v1/logs [get]
 func (a *ActivityLogApi) List(c *gin.Context) {
 	// 解析库ID
