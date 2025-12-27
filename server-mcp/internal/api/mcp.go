@@ -1,11 +1,13 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 
 	"go-mcp-context/internal/model/request"
 	"go-mcp-context/internal/model/response"
+	"go-mcp-context/internal/service"
+	"go-mcp-context/internal/transport"
+	"go-mcp-context/internal/transport/streamable"
 	"go-mcp-context/pkg/global"
 
 	"github.com/gin-gonic/gin"
@@ -80,7 +82,8 @@ type MCPApi struct{}
 // 	})
 // }
 
-// HandleRequest 处理 MCP JSON-RPC 请求
+// HandleRequest 处理 MCP JSON-RPC 请求 (新的统一入口)
+// 支持HTTP和Streamable HTTP两种协议
 func (m *MCPApi) HandleRequest(c *gin.Context) {
 	// 解析JSON-RPC请求
 	var req request.MCPRequest
@@ -96,38 +99,31 @@ func (m *MCPApi) HandleRequest(c *gin.Context) {
 		return
 	}
 
-	method := req.Method
-	id := req.ID
+	// 1. 检测传输协议
+	transportType := transport.DetectTransport(c)
 
-	// 根据方法分发请求
-	switch method {
-	case "initialize":
-		m.handleInitialize(c, req.Params, req.ID)
-	case "notifications/initialized", "initialized":
-		m.handleInitialized(c)
-	case "tools/list":
-		m.handleToolsList(c, id)
-	case "tools/call":
-		m.handleToolsCall(c, req.Params, req.ID)
-	case "resources/list":
-		m.handleResourcesList(c, id)
-	case "resources/templates/list":
-		m.handleResourceTemplatesList(c, id)
-	case "search-libraries":
-		m.handleSearchLibraries(c, req.Params, req.ID)
-	case "get-library-docs":
-		m.handleGetLibraryDocs(c, req.Params, req.ID)
-	default:
-		global.Log.Warn("未知的MCP方法", zap.String("method", method))
-		c.JSON(404, gin.H{
-			"jsonrpc": "2.0",
-			"id":      id,
-			"error": gin.H{
-				"code":    -32601,
-				"message": "Method not found",
-				"data":    fmt.Sprintf("Unknown method: %s", method),
-			},
-		})
+	// 2. 创建响应写入器
+	writer := transport.CreateResponseWriter(c, transportType)
+
+	// 3. 对于Streamable，设置请求信息以判断是否需要流式
+	if streamableWriter, ok := writer.(*streamable.StreamableResponseWriter); ok {
+		streamableWriter.SetRequestInfo(req.Method, req.Params)
+	}
+
+	// 4. 构造请求上下文
+	reqCtx := &transport.RequestContext{
+		Transport: transportType,
+		Method:    req.Method,
+		Params:    req.Params,
+		ID:        req.ID,
+		GinCtx:    c,
+	}
+
+	// 5. 调用统一处理器
+	handler := service.NewMCPHandler()
+	err := handler.ProcessRequest(reqCtx, writer)
+	if err != nil {
+		global.Log.Error("处理MCP请求失败", zap.Error(err))
 	}
 }
 
