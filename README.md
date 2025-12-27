@@ -49,6 +49,7 @@ go-mcp-context 是一个私有化的文档检索服务，通过 MCP 协议为 AI
 ## 📚 文档
 
 - [API 文档](docs/API.md) - REST API 和 MCP 工具说明
+- [Swagger API 文档](http://localhost:8090/swagger/index.html) - 交互式 API 文档（本地开发）
 - [架构文档](docs/ARCHITECTURE.md) - 技术栈、项目结构、数据模型
 - [部署指南](docs/DEPLOYMENT.md) - 环境配置、Docker 部署、Nginx 配置
 - [开发日志](docs/CHANGELOG.md) - 版本更新记录
