@@ -18,6 +18,19 @@ import (
 type LibraryApi struct{}
 
 // List 获取库列表（带统计信息）
+// @Summary 获取库列表
+// @Description 分页获取所有文档库，支持按名称搜索和排序
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Param name query string false "库名称（模糊搜索）"
+// @Param status query string false "库状态（可选）"
+// @Param sort query string false "排序方式：popular(热门) 或 recent(最新，默认)"
+// @Param page query int false "页码，默认 1" default(1)
+// @Param limit query int false "每页数量，默认 10，最大 50" default(10)
+// @Success 200 {object} response.Response{data=[]response.LibraryListItem}
+// @Failure 400 {object} response.Response
+// @Router /api/v1/libraries [get]
 func (l *LibraryApi) List(c *gin.Context) {
 	var req request.LibraryList
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -35,6 +48,17 @@ func (l *LibraryApi) List(c *gin.Context) {
 }
 
 // Create 创建库
+// @Summary 创建新库
+// @Description 创建一个新的文档库（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param data body request.LibraryCreate true "库信息"
+// @Success 200 {object} response.Response{data=response.LibraryInfo}
+// @Failure 400 {object} response.Response
+// @Failure 401 {object} response.Response
+// @Router /api/v1/libraries [post]
 func (l *LibraryApi) Create(c *gin.Context) {
 	var req request.LibraryCreate
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -62,6 +86,15 @@ func (l *LibraryApi) Create(c *gin.Context) {
 }
 
 // Get 获取库详情（带统计信息）
+// @Summary 获取库详情
+// @Description 获取指定库的完整信息，包括版本、统计数据等
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Param id path int true "库 ID"
+// @Success 200 {object} response.Response{data=response.LibraryInfo}
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/:id [get]
 func (l *LibraryApi) Get(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -79,6 +112,19 @@ func (l *LibraryApi) Get(c *gin.Context) {
 }
 
 // Update 更新库
+// @Summary 更新库信息
+// @Description 更新库的名称和描述（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param id path int true "库 ID"
+// @Param data body request.LibraryUpdate true "更新信息"
+// @Success 200 {object} response.Response{data=response.LibraryInfo}
+// @Failure 400 {object} response.Response
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/:id [put]
 func (l *LibraryApi) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -105,6 +151,17 @@ func (l *LibraryApi) Update(c *gin.Context) {
 }
 
 // Delete 删除库
+// @Summary 删除库
+// @Description 删除指定库及其所有版本和文档（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param id path int true "库 ID"
+// @Success 200 {object} response.Response{data=nil}
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/:id [delete]
 func (l *LibraryApi) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -130,6 +187,15 @@ func (l *LibraryApi) Delete(c *gin.Context) {
 }
 
 // GetVersions 获取库的所有版本（用于上传时选择）
+// @Summary 获取库的版本列表
+// @Description 获取指定库的所有版本及其统计信息（token数、chunk数、更新时间）
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Param id path int true "库 ID"
+// @Success 200 {object} response.Response{data=[]response.VersionInfo}
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/:id/versions [get]
 func (l *LibraryApi) GetVersions(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -147,6 +213,19 @@ func (l *LibraryApi) GetVersions(c *gin.Context) {
 }
 
 // CreateVersion 创建新版本
+// @Summary 创建新版本
+// @Description 为指定库创建新版本（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param id path int true "库 ID"
+// @Param data body request.VersionCreate true "版本信息"
+// @Success 200 {object} response.Response{data=nil}
+// @Failure 400 {object} response.Response
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/:id/versions [post]
 func (l *LibraryApi) CreateVersion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -173,6 +252,18 @@ func (l *LibraryApi) CreateVersion(c *gin.Context) {
 }
 
 // DeleteVersion 删除版本及其所有文档
+// @Summary 删除版本
+// @Description 删除指定库的版本及其所有文档和chunks（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param id path int true "库 ID"
+// @Param version path string true "版本号"
+// @Success 200 {object} response.Response{data=nil}
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/:id/versions/:version [delete]
 func (l *LibraryApi) DeleteVersion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -205,6 +296,18 @@ func (l *LibraryApi) DeleteVersion(c *gin.Context) {
 }
 
 // RefreshVersion 刷新版本（重新处理所有文档）
+// @Summary 刷新版本
+// @Description 重新处理指定版本的所有文档，更新向量和chunks（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param id path int true "库 ID"
+// @Param version path string true "版本号"
+// @Success 200 {object} response.Response{data=nil}
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/:id/versions/:version/refresh [post]
 func (l *LibraryApi) RefreshVersion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -229,6 +332,18 @@ func (l *LibraryApi) RefreshVersion(c *gin.Context) {
 }
 
 // RefreshVersionSSE 刷新版本（SSE 实时推送处理状态）
+// @Summary 刷新版本（SSE 实时推送）
+// @Description 重新处理指定版本的所有文档，通过 SSE 实时推送处理进度（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce text/event-stream
+// @Security JWTAuth
+// @Param id path int true "库 ID"
+// @Param version path string true "版本号"
+// @Success 200 {object} response.RefreshStatus "刷新状态流"
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/:id/versions/:version/refresh-sse [post]
 func (l *LibraryApi) RefreshVersionSSE(c *gin.Context) {
 	// 创建 SSE 写入器
 	sse, ok := response.NewSSEWriter(c)
@@ -273,15 +388,20 @@ func (l *LibraryApi) RefreshVersionSSE(c *gin.Context) {
 // GitHub 导入相关 API
 // ==========================================
 
-// ImportFromGitHubAsync 从 GitHub 导入文档（异步，立即返回）
+// ImportFromGitHub 从 GitHub 导入文档（异步，立即返回）
 // @Summary 从 GitHub 导入文档（异步）
-// @Tags Library
+// @Description 从 GitHub 仓库导入文档到指定库版本，异步处理，立即返回（需要认证）
+// @Tags Libraries
 // @Accept json
 // @Produce json
-// @Param id path int true "库 ID"
-// @Param data body request.GitHubImportRequest true "导入参数"
-// @Success 200 {object} response.Response
-// @Router /libraries/github/import [post]
+// @Security JWTAuth
+// @Param id query int true "库 ID"
+// @Param data body request.GitHubImportRequest true "导入参数（repo、branch、version）"
+// @Success 200 {object} response.Response{data=nil}
+// @Failure 400 {object} response.Response
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/github/import [post]
 func (l *LibraryApi) ImportFromGitHub(c *gin.Context) {
 	// 解析库 ID（从 query 参数获取）
 	id, err := strconv.ParseUint(c.Query("id"), 10, 32)
@@ -340,6 +460,19 @@ func (l *LibraryApi) ImportFromGitHub(c *gin.Context) {
 }
 
 // ImportFromGitHubSSE 从 GitHub 导入文档（SSE 实时推送进度）
+// @Summary 从 GitHub 导入文档（SSE 实时推送）
+// @Description 从 GitHub 仓库导入文档到指定库版本，通过 SSE 实时推送导入进度（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce text/event-stream
+// @Security JWTAuth
+// @Param id query int true "库 ID"
+// @Param data body request.GitHubImportRequest true "导入参数（repo、branch、version）"
+// @Success 200 {object} response.GitHubImportProgress "导入进度流"
+// @Failure 400 {object} response.Response
+// @Failure 401 {object} response.Response
+// @Failure 404 {object} response.Response
+// @Router /api/v1/libraries/github/import-sse [post]
 func (l *LibraryApi) ImportFromGitHubSSE(c *gin.Context) {
 	// 创建 SSE 写入器
 	sse, ok := response.NewSSEWriter(c)
@@ -390,6 +523,15 @@ func (l *LibraryApi) ImportFromGitHubSSE(c *gin.Context) {
 }
 
 // GetGitHubReleases 获取 GitHub 仓库的版本列表
+// @Summary 获取 GitHub 仓库版本列表
+// @Description 获取指定 GitHub 仓库的主要版本列表和仓库信息
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Param repo query string true "GitHub 仓库名（格式：owner/repo）"
+// @Success 200 {object} response.Response{data=map[string]interface{}}
+// @Failure 400 {object} response.Response
+// @Router /api/v1/libraries/github/releases [get]
 func (l *LibraryApi) GetGitHubReleases(c *gin.Context) {
 	repo := c.Query("repo")
 	if repo == "" {
@@ -420,6 +562,17 @@ func (l *LibraryApi) GetGitHubReleases(c *gin.Context) {
 }
 
 // InitImportFromGitHub 从 GitHub URL 初始化导入（创建库 + 导入默认分支）
+// @Summary 从 GitHub URL 初始化导入
+// @Description 从 GitHub URL 创建新库并导入默认分支的文档，自动生成库名（需要认证）
+// @Tags Libraries
+// @Accept json
+// @Produce json
+// @Security JWTAuth
+// @Param data body request.GitHubInitImportRequest true "GitHub URL"
+// @Success 200 {object} response.Response{data=response.GitHubInitImportResponse}
+// @Failure 400 {object} response.Response
+// @Failure 401 {object} response.Response
+// @Router /api/v1/libraries/github/init-import [post]
 func (l *LibraryApi) InitImportFromGitHub(c *gin.Context) {
 	var req request.GitHubInitImportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

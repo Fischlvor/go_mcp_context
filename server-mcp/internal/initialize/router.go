@@ -1,14 +1,18 @@
 package initialize
 
 import (
+	"os"
+	"strconv"
+
 	"go-mcp-context/internal/middleware"
 	"go-mcp-context/internal/router"
 	"go-mcp-context/pkg/global"
-	"strconv"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 )
 
@@ -76,6 +80,12 @@ func InitRouter() *gin.Engine {
 	mcp.Use(middleware.MCPLogMiddleware()) // 添加MCP日志中间件，放在API Key认证之后
 	{
 		routerGroup.InitMCPRouter(mcp)
+	}
+
+	// Swagger UI（仅在生产环境禁用，其他环境启用）
+	if appEnv := os.Getenv("APP_ENV"); appEnv != "prod" {
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+		global.Log.Info("Swagger UI 已启用", zap.String("url", "http://localhost:8090/swagger/index.html"))
 	}
 
 	return r
