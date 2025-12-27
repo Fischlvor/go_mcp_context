@@ -4,6 +4,68 @@
 
 ---
 
+## 2025-12-27
+
+### Added
+
+- **MCP 协议规范化与 Costrict 集成**
+  - 新增 `internal/transport/` 包：实现 HTTP、SSE、Streamable HTTP 三种传输协议的抽象层
+    - `interface.go`：定义 `ResponseWriter` 和 `RequestContext` 接口
+    - `detector.go`：自动检测请求的传输协议类型
+    - `factory.go`：工厂方法创建对应的响应写入器
+    - `types.go`：传输相关的数据结构定义
+    - `http/writer.go`：HTTP 协议响应写入器
+    - `streamable/writer.go`：Streamable HTTP 协议响应写入器（支持流式响应）
+    - `sse/`：SSE 协议实现（连接管理、消息写入）
+
+- **MCP 服务层重构**
+  - 新增 `internal/service/mcp_handler.go`：统一的 MCP 请求处理器
+    - `ProcessRequest()` 方法：根据 method 分发请求到对应的处理函数
+    - `handleInitialize()`、`handleInitialized()`：初始化流程
+    - `handleToolsList()`、`handleToolsCall()`：工具列表和调用
+    - `handleResourcesList()`、`handleResourceTemplatesList()`、`handleResourcesRead()`：资源管理
+    - 所有响应都转换为 MCP 规范的 `{content: [{type: "text", text: "..."}]}` 格式
+
+- **MCPService 扩展**
+  - `GetAllLibraries()`：获取所有活跃库列表，支持 `resources/list` 动态生成
+  - `GetLibraryByID(id)`：根据 ID 获取库详细信息，支持 `resources/read` 读取库元数据
+
+### Changed
+
+- **MCP 响应格式规范化**
+  - `search-libraries` 工具：响应转换为 `{content: [{type: "text", text: "{\"libraries\": [...]}"}]}`
+  - `get-library-docs` 工具：响应转换为 `{content: [{type: "text", text: "{\"documents\": [...]}"}]}`
+  - 确保与 Costrict 客户端的 `McpToolCallResponse` 类型兼容
+
+- **search-libraries 工具描述增强**
+  - 添加版本信息说明：告知 LLM 可通过此工具获取库的 `versions` 数组和 `defaultVersion`
+  - 引导 LLM 先调用 `search-libraries` 获取版本，再调用 `get-library-docs` 时使用正确的版本号
+
+- **版本数组完整性**
+  - 修复 `SearchLibraries()` 方法：确保 `defaultVersion` 总是包含在 `versions` 数组中
+  - 如果 `versions` 为空，则只包含 `defaultVersion`
+  - 如果 `versions` 不为空但不包含 `defaultVersion`，则将其添加到数组开头
+
+- **API 层统一入口**
+  - 重构 `internal/api/mcp.go` 的 `HandleRequest()` 方法
+  - 使用新的传输层抽象，支持多种协议
+  - 调用统一的 `MCPHandler.ProcessRequest()` 处理所有 MCP 请求
+
+### Fixed
+
+- 修复 `resources/list` 中库的版本信息不完整的问题
+- 修复 `get-library-docs` 响应格式不符合 MCP 规范的问题（缺少 `content` 包装）
+- 修复 `search-libraries` 响应格式不符合 MCP 规范的问题
+
+### Architecture
+
+- 实现了协议无关的 MCP 处理架构
+- 支持多种传输协议（HTTP、SSE(暂未支持)、Streamable HTTP）
+- 业务逻辑与传输层完全解耦
+- 便于后续添加新的传输协议或修改响应格式
+
+---
+
 ## 2025-12-26
 
 ### Added
