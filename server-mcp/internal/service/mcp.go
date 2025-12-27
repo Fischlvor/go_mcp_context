@@ -204,3 +204,35 @@ func calculateMatchScore(query, name string) float64 {
 	}
 	return similarity * 0.7 // 最高 0.7 分
 }
+
+// GetAllLibraries 获取所有可用的库
+func (s *MCPService) GetAllLibraries() ([]dbmodel.Library, error) {
+	var libraries []dbmodel.Library
+
+	err := global.DB.Where("status = ?", "active").
+		Order("id ASC").
+		Find(&libraries).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return libraries, nil
+}
+
+// GetLibraryByID 根据ID获取库信息
+func (s *MCPService) GetLibraryByID(id uint) (*dbmodel.Library, error) {
+	var library dbmodel.Library
+
+	err := global.DB.Where("id = ? AND status = ?", id, "active").
+		First(&library).Error
+
+	if err != nil {
+		if err.Error() == "record not found" {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &library, nil
+}
