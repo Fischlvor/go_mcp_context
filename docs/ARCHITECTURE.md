@@ -49,7 +49,15 @@ go-mcp-context/
 │   │   │   ├── request/      # 请求模型
 │   │   │   └── response/     # 响应模型
 │   │   ├── router/           # 路由配置
-│   │   └── service/          # 业务逻辑
+│   │   ├── service/          # 业务逻辑
+│   │   └── transport/        # 传输层（协议抽象）
+│   │       ├── interface.go  # ResponseWriter 接口
+│   │       ├── types.go      # 数据结构定义
+│   │       ├── detector.go   # 协议检测
+│   │       ├── factory.go    # 响应写入器工厂
+│   │       ├── http/         # HTTP 协议实现
+│   │       ├── streamable/   # Streamable HTTP 实现
+│   │       └── sse/          # SSE 协议实现
 │   ├── pkg/                  # 公共包
 │   │   ├── bufferedwriter/   # 异步批量写入框架
 │   │   ├── cache/            # 缓存接口
@@ -154,3 +162,191 @@ go-mcp-context/
 | latency_ms | int64 | 延迟（毫秒） |
 | status | string | success / error |
 | error_msg | string | 错误信息 |
+
+---
+
+## MCP 处理架构
+
+### 分层设计
+
+```
+┌─────────────────────────────────────────┐
+│         HTTP 请求入口                    │
+│    (internal/api/mcp.go)                │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│      传输层 (Transport Layer)            │
+│  - 协议检测 (HTTP/SSE/Streamable)      │
+│  - 响应写入器工厂                       │
+│  (internal/transport/)                  │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│      处理器层 (Handler Layer)            │
+│  - MCP 请求分发                         │
+│  - 方法路由                             │
+│  (internal/service/mcp_handler.go)     │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│      业务逻辑层 (Service Layer)          │
+│  - SearchLibraries                      │
+│  - GetLibraryDocs                       │
+│  - GetAllLibraries                      │
+│  (internal/service/mcp.go)             │
+└─────────────────────────────────────────┘
+```
+
+### 核心特性
+
+#### 1. 协议无关的处理架构
+- **业务逻辑与传输协议完全解耦**
+- 支持多种传输协议（HTTP、SSE、Streamable HTTP）
+- 新增协议只需实现 `ResponseWriter` 接口
+
+#### 2. 统一的 MCP 请求处理
+- `MCPHandler.ProcessRequest()` 方法分发所有 MCP 请求
+- 支持的方法：
+  - `initialize` / `notifications/initialized` - 初始化
+  - `tools/list` / `tools/call` - 工具管理
+  - `resources/list` / `resources/templates/list` / `resources/read` - 资源管理
+
+#### 3. MCP 规范响应格式
+- 所有 `tools/call` 响应遵循规范：
+  ```json
+  {
+    "content": [
+      {
+        "type": "text",
+        "text": "<JSON string>"
+      }
+    ]
+  }
+  ```
+- 实际数据在 `text` 字段中以 JSON 字符串形式存储
+- 与 Costrict 客户端的 `McpToolCallResponse` 类型完全兼容
+
+### 传输层接口
+
+```go
+// ResponseWriter 接口 - 所有传输协议必须实现
+type ResponseWriter interface {
+    WriteResponse(resp *MCPResponse) error
+    WriteError(err *MCPError, id interface{}) error
+    WriteEvent(event interface{}) error
+}
+
+// RequestContext - 请求上下文
+type RequestContext struct {
+    Transport TransportType
+    Method    string
+    Params    interface{}
+    ID        interface{}
+    GinCtx    *gin.Context
+}
+
+// TransportType - 传输协议类型
+type TransportType string
+
+const (
+    TransportHTTP       TransportType = "http"
+    TransportSSE        TransportType = "sse"
+    TransportStreamable TransportType = "streamable"
+)
+```
+
+### 工作流程示例
+
+**请求：** `POST /mcp` with `tools/call` method
+
+```
+1. API 层 (HandleRequest)
+   ├─ 解析 JSON-RPC 请求
+   ├─ 检测传输协议类型
+   └─ 创建响应写入器
+
+2. 传输层 (Transport)
+   ├─ 自动检测协议（HTTP/SSE/Streamable）
+   └─ 创建对应的 ResponseWriter
+
+3. 处理器层 (MCPHandler)
+   ├─ 根据 method 分发请求
+   ├─ 调用 handleToolsCall()
+   └─ 获取业务逻辑结果
+
+4. 业务逻辑层 (MCPService)
+   ├─ SearchLibraries() / GetLibraryDocs()
+   └─ 返回原始数据
+
+5. 处理器层 (MCPHandler)
+   ├─ 将原始数据转换为 MCP 规范格式
+   └─ 调用 ResponseWriter.WriteResponse()
+
+6. 传输层 (ResponseWriter)
+   └─ 根据协议类型发送响应
+
+7. 客户端接收
+   └─ 解析 McpToolCallResponse 格式
+```
+
+### 版本管理设计
+
+#### search-libraries 响应
+- `defaultVersion`：默认版本（通常为 `latest`）
+- `versions` 数组：所有可用版本列表
+- **关键设计**：`defaultVersion` 总是包含在 `versions` 数组中
+
+#### LLM 工作流指导
+1. 调用 `search-libraries` 获取库的版本信息
+2. 从响应的 `versions` 数组中选择一个版本
+3. 调用 `get-library-docs` 时使用选中的版本号
+
+这样设计的优势：
+- LLM 可直接使用 `versions` 数组中的任意版本
+- 避免硬编码版本号
+- 支持库的多个版本管理
+
+---
+
+## 可扩展性设计
+
+### 新增传输协议
+只需在 `internal/transport/` 中添加新的 Writer 实现：
+
+```go
+// 例如：添加 WebSocket 支持
+type WebSocketResponseWriter struct {
+    conn *websocket.Conn
+}
+
+func (w *WebSocketResponseWriter) WriteResponse(resp *MCPResponse) error {
+    return w.conn.WriteJSON(resp)
+}
+```
+
+### 新增 MCP 方法
+只需在 `MCPHandler` 中添加新的 handle 函数：
+
+```go
+func (h *MCPHandler) handleNewMethod(req *RequestContext, writer ResponseWriter) error {
+    // 业务逻辑
+    result := h.mcpService.NewMethod(...)
+    
+    // 转换为 MCP 规范格式
+    mcpResult := convertToMCPFormat(result)
+    
+    // 发送响应
+    return writer.WriteResponse(&MCPResponse{
+        JSONRPC: "2.0",
+        ID:      req.ID,
+        Result:  mcpResult,
+    })
+}
+```
+
+### 修改响应格式
+只需修改 ResponseWriter 的实现，无需改动业务逻辑

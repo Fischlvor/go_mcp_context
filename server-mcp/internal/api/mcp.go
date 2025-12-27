@@ -83,7 +83,17 @@ type MCPApi struct{}
 // }
 
 // HandleRequest 处理 MCP JSON-RPC 请求 (新的统一入口)
-// 支持HTTP和Streamable HTTP两种协议
+// @Summary MCP 请求处理
+// @Description 处理 MCP JSON-RPC 2.0 协议请求，支持 initialize、tools/list、tools/call、resources/list 等方法（需要 MCP_API_KEY）
+// @Tags MCP
+// @Accept json
+// @Produce json
+// @Security MCP_API_KEY
+// @Param request body request.MCPRequest true "MCP JSON-RPC 请求"
+// @Success 200 {object} response.MCPResponse
+// @Failure 400 {object} response.MCPResponse
+// @Failure 401 {object} response.MCPResponse
+// @Router /mcp [post]
 func (m *MCPApi) HandleRequest(c *gin.Context) {
 	// 解析JSON-RPC请求
 	var req request.MCPRequest

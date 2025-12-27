@@ -1,0 +1,1429 @@
+basePath: /
+definitions:
+  request.APIKeyCreate:
+    properties:
+      name:
+        maxLength: 100
+        type: string
+    required:
+    - name
+    type: object
+  request.GitHubImportRequest:
+    properties:
+      branch:
+        description: 分支名（与 Tag 二选一）
+        type: string
+      excludes:
+        description: 排除模式
+        items:
+          type: string
+        type: array
+      path_filter:
+        description: 只导入指定路径（如 docs/）
+        type: string
+      repo:
+        description: owner/repo
+        type: string
+      tag:
+        description: 特定 tag
+        type: string
+      version:
+        description: 存储为的版本名
+        type: string
+    required:
+    - repo
+    type: object
+  request.GitHubInitImportRequest:
+    properties:
+      github_url:
+        description: 完整 GitHub URL，如 https://github.com/gin-gonic/gin
+        type: string
+    required:
+    - github_url
+    type: object
+  request.LibraryCreate:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  request.LibraryUpdate:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  request.MCPRequest:
+    properties:
+      id: {}
+      jsonrpc:
+        type: string
+      method:
+        type: string
+      params:
+        additionalProperties: true
+        type: object
+    type: object
+  request.Search:
+    properties:
+      library_id:
+        type: integer
+      limit:
+        description: 每页数量，默认 10，最大 50
+        type: integer
+      mode:
+        description: code, info, 或空（全部）
+        type: string
+      page:
+        description: 页码，默认 1
+        type: integer
+      query:
+        type: string
+      version:
+        description: 版本，必填
+        type: string
+    required:
+    - library_id
+    - query
+    - version
+    type: object
+  request.VersionCreate:
+    properties:
+      version:
+        maxLength: 50
+        minLength: 1
+        type: string
+    required:
+    - version
+    type: object
+  response.APIKeyCreateResponse:
+    properties:
+      api_key:
+        description: 完整 key，仅此一次显示
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      token_suffix:
+        description: 后 4 位
+        type: string
+    type: object
+  response.APIKeyListItem:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      last_used_at:
+        type: string
+      name:
+        type: string
+      token_suffix:
+        description: 后 4 位
+        type: string
+    type: object
+  response.GitHubImportProgress:
+    properties:
+      current:
+        description: 当前进度
+        type: integer
+      filename:
+        description: 当前文件名
+        type: string
+      message:
+        description: 状态消息
+        type: string
+      stage:
+        description: fetching_tree, downloading, processing, completed, failed
+        type: string
+      total:
+        description: 总数
+        type: integer
+    type: object
+  response.GitHubInitImportResponse:
+    properties:
+      library_id:
+        type: integer
+      version:
+        type: string
+    type: object
+  response.LibraryInfo:
+    properties:
+      chunk_count:
+        type: integer
+      created_at:
+        type: string
+      default_version:
+        type: string
+      description:
+        type: string
+      document_count:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      source_type:
+        type: string
+      source_url:
+        type: string
+      status:
+        type: string
+      token_count:
+        type: integer
+      updated_at:
+        type: string
+      versions:
+        items:
+          type: string
+        type: array
+    type: object
+  response.LibraryListItem:
+    properties:
+      chunk_count:
+        description: 对应 Context7 的 SNIPPETS
+        type: integer
+      default_version:
+        description: 当前版本
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      source_type:
+        description: github, website, local
+        type: string
+      source_url:
+        description: vuejs/docs
+        type: string
+      token_count:
+        description: 对应 Context7 的 TOKENS
+        type: integer
+      updated_at:
+        description: 对应 Context7 的 UPDATE
+        type: string
+    type: object
+  response.MCPError:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  response.MCPResponse:
+    properties:
+      error:
+        $ref: '#/definitions/response.MCPError'
+      id: {}
+      jsonrpc:
+        type: string
+      result: {}
+    type: object
+  response.ProcessStatus:
+    properties:
+      message:
+        type: string
+      progress:
+        description: 0-100
+        type: integer
+      stage:
+        description: uploaded, parsing, chunking, embedding, saving, completed, failed
+        type: string
+      status:
+        description: processing, active, failed
+        type: string
+    type: object
+  response.RefreshStatus:
+    properties:
+      current:
+        description: 当前第几个
+        type: integer
+      doc_id:
+        description: 文档 ID
+        type: integer
+      doc_title:
+        description: 文档标题
+        type: string
+      message:
+        description: 消息
+        type: string
+      stage:
+        description: '阶段: started, doc_processing, doc_completed, doc_failed, all_completed,
+          error'
+        type: string
+      total:
+        description: 总共几个
+        type: integer
+    type: object
+  response.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      msg:
+        type: string
+    type: object
+  response.SearchResult:
+    properties:
+      hasMore:
+        type: boolean
+      limit:
+        type: integer
+      page:
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/response.SearchResultItem'
+        type: array
+      total:
+        type: integer
+    type: object
+  response.SearchResultItem:
+    properties:
+      chunk_id:
+        type: integer
+      code:
+        description: 代码内容（code mode），info mode 为空
+        type: string
+      content:
+        description: ChunkText 原文
+        type: string
+      description:
+        description: LLM 生成的描述（code mode），info mode 为空
+        type: string
+      language:
+        description: 代码语言（code mode），info mode 为空
+        type: string
+      library_id:
+        type: integer
+      mode:
+        description: 类型：code 或 info
+        type: string
+      relevance:
+        description: 最终相关性分数 0-1
+        type: number
+      source:
+        description: 文件来源路径
+        type: string
+      title:
+        description: LLM 生成的标题（code mode）或 headers 层级（info mode）
+        type: string
+      tokens:
+        description: token 数
+        type: integer
+      upload_id:
+        type: integer
+      version:
+        description: 文档版本
+        type: string
+    type: object
+  response.VersionInfo:
+    properties:
+      chunk_count:
+        type: integer
+      last_updated:
+        type: string
+      token_count:
+        type: integer
+      version:
+        type: string
+    type: object
+host: 10.21.71.19:8090
+info:
+  contact:
+    name: API Support
+    url: http://www.swagger.io/support
+  description: 私有化文档检索服务 - 为企业内网的 AI IDE 提供实时、准确的技术文档和代码示例
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: go-mcp-context API
+  version: 1.0.0
+paths:
+  /api/v1/api-keys/:id:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定的 API Key（需要认证）
+      parameters:
+      - description: API Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 删除 API Key
+      tags:
+      - API Keys
+  /api/v1/api-keys/create:
+    post:
+      consumes:
+      - application/json
+      description: 为当前用户创建新的 API Key，用于 MCP 协议调用（需要认证）
+      parameters:
+      - description: API Key 信息
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.APIKeyCreate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.APIKeyCreateResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 创建 API Key
+      tags:
+      - API Keys
+  /api/v1/api-keys/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前用户的所有 API Key（需要认证）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.APIKeyListItem'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 获取 API Key 列表
+      tags:
+      - API Keys
+  /api/v1/auth/callback:
+    get:
+      consumes:
+      - application/json
+      description: SSO 服务回调接口，用 code 换取 token 并设置 session
+      parameters:
+      - description: SSO 授权码
+        in: query
+        name: code
+        required: true
+        type: string
+      - description: SSO 状态参数
+        in: query
+        name: state
+        type: string
+      - description: SSO 回调地址
+        in: query
+        name: redirect_uri
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: SSO 登录回调
+      tags:
+      - Auth
+  /api/v1/auth/sso_login_url:
+    get:
+      consumes:
+      - application/json
+      description: 获取 SSO 授权地址，用于重定向到 SSO 服务进行登录
+      parameters:
+      - description: SSO 回调地址，默认使用配置中的值
+        in: query
+        name: redirect_uri
+        type: string
+      - description: 登录后要返回的 URL，默认为 /
+        in: query
+        name: return_url
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 获取 SSO 登录地址
+      tags:
+      - Auth
+  /api/v1/documents/chunks/{mode}/{libid}:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定库的文档块，支持向量搜索和全量列表。mode 为 code 或 info，version 可选（默认使用库的默认版本），topic
+        可选（传入则进行向量搜索）
+      parameters:
+      - description: 模式：code(代码示例) 或 info(文档说明)
+        in: path
+        name: mode
+        required: true
+        type: string
+      - description: 库 ID
+        in: path
+        name: libid
+        required: true
+        type: integer
+      - description: 版本号，不传则使用库的默认版本
+        in: query
+        name: version
+        type: string
+      - description: 搜索主题，不传则返回全部文档块
+        in: query
+        name: topic
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取文档块
+      tags:
+      - Documents
+  /api/v1/documents/detail/:id:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定文档的完整信息
+      parameters:
+      - description: 文档 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取文档详情
+      tags:
+      - Documents
+  /api/v1/documents/list:
+    get:
+      consumes:
+      - application/json
+      description: 分页获取指定库的文档列表
+      parameters:
+      - description: 库 ID
+        in: query
+        name: library_id
+        required: true
+        type: integer
+      - description: 版本号（可选）
+        in: query
+        name: version
+        type: string
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量，默认 10，最大 50
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取文档列表
+      tags:
+      - Documents
+  /api/v1/documents/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传文档文件到指定库版本（支持 Markdown、PDF、DOCX、Swagger）（需要认证）
+      parameters:
+      - description: 库 ID
+        in: formData
+        name: library_id
+        required: true
+        type: integer
+      - description: 版本号，默认为 latest
+        in: formData
+        name: version
+        type: string
+      - description: 文档文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 上传文档
+      tags:
+      - Documents
+  /api/v1/documents/upload-sse:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传文档文件到指定库版本，通过 SSE 实时推送处理进度（需要认证）
+      parameters:
+      - description: 库 ID
+        in: formData
+        name: library_id
+        required: true
+        type: integer
+      - description: 版本号，默认为 latest
+        in: formData
+        name: version
+        type: string
+      - description: 文档文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: 处理状态流
+          schema:
+            $ref: '#/definitions/response.ProcessStatus'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 上传文档（SSE 实时推送）
+      tags:
+      - Documents
+  /api/v1/libraries:
+    get:
+      consumes:
+      - application/json
+      description: 分页获取所有文档库，支持按名称搜索和排序
+      parameters:
+      - description: 库名称（模糊搜索）
+        in: query
+        name: name
+        type: string
+      - description: 库状态（可选）
+        in: query
+        name: status
+        type: string
+      - description: 排序方式：popular(热门) 或 recent(最新，默认)
+        in: query
+        name: sort
+        type: string
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量，默认 10，最大 50
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.LibraryListItem'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取库列表
+      tags:
+      - Libraries
+    post:
+      consumes:
+      - application/json
+      description: 创建一个新的文档库（需要认证）
+      parameters:
+      - description: 库信息
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.LibraryCreate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.LibraryInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 创建新库
+      tags:
+      - Libraries
+  /api/v1/libraries/:id:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定库及其所有版本和文档（需要认证）
+      parameters:
+      - description: 库 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 删除库
+      tags:
+      - Libraries
+    get:
+      consumes:
+      - application/json
+      description: 获取指定库的完整信息，包括版本、统计数据等
+      parameters:
+      - description: 库 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.LibraryInfo'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取库详情
+      tags:
+      - Libraries
+    put:
+      consumes:
+      - application/json
+      description: 更新库的名称和描述（需要认证）
+      parameters:
+      - description: 库 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新信息
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.LibraryUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.LibraryInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 更新库信息
+      tags:
+      - Libraries
+  /api/v1/libraries/:id/versions:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定库的所有版本及其统计信息（token数、chunk数、更新时间）
+      parameters:
+      - description: 库 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/response.VersionInfo'
+                  type: array
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取库的版本列表
+      tags:
+      - Libraries
+    post:
+      consumes:
+      - application/json
+      description: 为指定库创建新版本（需要认证）
+      parameters:
+      - description: 库 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 版本信息
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.VersionCreate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 创建新版本
+      tags:
+      - Libraries
+  /api/v1/libraries/:id/versions/:version:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定库的版本及其所有文档和chunks（需要认证）
+      parameters:
+      - description: 库 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 版本号
+        in: path
+        name: version
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 删除版本
+      tags:
+      - Libraries
+  /api/v1/libraries/:id/versions/:version/refresh:
+    post:
+      consumes:
+      - application/json
+      description: 重新处理指定版本的所有文档，更新向量和chunks（需要认证）
+      parameters:
+      - description: 库 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 版本号
+        in: path
+        name: version
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 刷新版本
+      tags:
+      - Libraries
+  /api/v1/libraries/:id/versions/:version/refresh-sse:
+    post:
+      consumes:
+      - application/json
+      description: 重新处理指定版本的所有文档，通过 SSE 实时推送处理进度（需要认证）
+      parameters:
+      - description: 库 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 版本号
+        in: path
+        name: version
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: 刷新状态流
+          schema:
+            $ref: '#/definitions/response.RefreshStatus'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 刷新版本（SSE 实时推送）
+      tags:
+      - Libraries
+  /api/v1/libraries/github/import:
+    post:
+      consumes:
+      - application/json
+      description: 从 GitHub 仓库导入文档到指定库版本，异步处理，立即返回（需要认证）
+      parameters:
+      - description: 库 ID
+        in: query
+        name: id
+        required: true
+        type: integer
+      - description: 导入参数（repo、branch、version）
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.GitHubImportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 从 GitHub 导入文档（异步）
+      tags:
+      - Libraries
+  /api/v1/libraries/github/import-sse:
+    post:
+      consumes:
+      - application/json
+      description: 从 GitHub 仓库导入文档到指定库版本，通过 SSE 实时推送导入进度（需要认证）
+      parameters:
+      - description: 库 ID
+        in: query
+        name: id
+        required: true
+        type: integer
+      - description: 导入参数（repo、branch、version）
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.GitHubImportRequest'
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: 导入进度流
+          schema:
+            $ref: '#/definitions/response.GitHubImportProgress'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 从 GitHub 导入文档（SSE 实时推送）
+      tags:
+      - Libraries
+  /api/v1/libraries/github/init-import:
+    post:
+      consumes:
+      - application/json
+      description: 从 GitHub URL 创建新库并导入默认分支的文档，自动生成库名（需要认证）
+      parameters:
+      - description: GitHub URL
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.GitHubInitImportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.GitHubInitImportResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 从 GitHub URL 初始化导入
+      tags:
+      - Libraries
+  /api/v1/libraries/github/releases:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定 GitHub 仓库的主要版本列表和仓库信息
+      parameters:
+      - description: GitHub 仓库名（格式：owner/repo）
+        in: query
+        name: repo
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取 GitHub 仓库版本列表
+      tags:
+      - Libraries
+  /api/v1/logs:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: 库ID
+        in: query
+        name: libraryId
+        required: true
+        type: integer
+      - description: 返回数量，默认50，最大100
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+      summary: 获取活动日志列表
+      tags:
+      - ActivityLog
+  /api/v1/search:
+    post:
+      consumes:
+      - application/json
+      description: 在指定库的指定版本中搜索文档，支持 code 和 info 两种模式，支持分页
+      parameters:
+      - description: 搜索条件
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.Search'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.SearchResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 搜索文档
+      tags:
+      - Search
+  /api/v1/stats/my:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前用户的库、文档、API Key 等统计数据（需要认证）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 获取统计数据
+      tags:
+      - Stats
+  /api/v1/user/info:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前登录用户的信息（需要认证）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - JWTAuth: []
+      summary: 获取用户信息
+      tags:
+      - User
+  /mcp:
+    post:
+      consumes:
+      - application/json
+      description: 处理 MCP JSON-RPC 2.0 协议请求，支持 initialize、tools/list、tools/call、resources/list
+        等方法（需要 MCP_API_KEY）
+      parameters:
+      - description: MCP JSON-RPC 请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.MCPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.MCPResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.MCPResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.MCPResponse'
+      security:
+      - MCP_API_KEY: []
+      summary: MCP 请求处理
+      tags:
+      - MCP
+schemes:
+- http
+- https
+securityDefinitions:
+  JWTAuth:
+    description: JWT token in the format "Bearer {token}"
+    in: header
+    name: Authorization
+    type: apiKey
+  MCP_API_KEY:
+    description: API Key for MCP protocol calls
+    in: header
+    name: MCP_API_KEY
+    type: apiKey
+swagger: "2.0"
