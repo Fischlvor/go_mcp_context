@@ -73,6 +73,7 @@ func InitRouter() *gin.Engine {
 	// MCP routes（需要 API Key 认证）- IDE 调用
 	mcp := r.Group("")
 	mcp.Use(middleware.APIKeyAuth())
+	mcp.Use(middleware.MCPLogMiddleware()) // 添加MCP日志中间件，放在API Key认证之后
 	{
 		routerGroup.InitMCPRouter(mcp)
 	}

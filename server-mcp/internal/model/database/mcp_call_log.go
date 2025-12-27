@@ -6,8 +6,14 @@ import (
 
 // MCP 函数名常量
 const (
-	MCPFuncSearchLibraries = "search_libraries"
-	MCPFuncGetLibraryDocs  = "get_library_docs"
+	MCPFuncSearchLibraries       = "search_libraries"
+	MCPFuncGetLibraryDocs        = "get_library_docs"
+	MCPFuncInitialize            = "initialize"
+	MCPFuncInitialized           = "initialized"
+	MCPFuncToolsList             = "tools_list"
+	MCPFuncToolsCall             = "tools_call"
+	MCPFuncResourcesList         = "resources_list"
+	MCPFuncResourceTemplatesList = "resource_templates_list"
 )
 
 // MCPCallLog MCP 调用日志
