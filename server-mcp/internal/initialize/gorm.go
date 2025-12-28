@@ -84,7 +84,7 @@ func InitTables() {
 
 // createIndexes 创建数据库索引
 func createIndexes() {
-	// 向量索引 (HNSW)
+	// 向量索引 (HNSW) - document_chunks
 	indexSQL := `
 		CREATE INDEX IF NOT EXISTS idx_chunks_embedding 
 		ON document_chunks 
@@ -92,7 +92,18 @@ func createIndexes() {
 		WITH (m = 16, ef_construction = 64)
 	`
 	if err := global.DB.Exec(indexSQL).Error; err != nil {
-		fmt.Printf("Warning: Could not create vector index: %v\n", err)
+		fmt.Printf("Warning: Could not create vector index for document_chunks: %v\n", err)
+	}
+
+	// 向量索引 (HNSW) - libraries
+	libraryIndexSQL := `
+		CREATE INDEX IF NOT EXISTS idx_libraries_embedding 
+		ON libraries 
+		USING hnsw (embedding vector_cosine_ops)
+		WITH (m = 16, ef_construction = 64)
+	`
+	if err := global.DB.Exec(libraryIndexSQL).Error; err != nil {
+		fmt.Printf("Warning: Could not create vector index for libraries: %v\n", err)
 	}
 
 	// 全文搜索索引
