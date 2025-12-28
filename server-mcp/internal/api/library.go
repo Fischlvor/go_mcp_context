@@ -19,11 +19,11 @@ type LibraryApi struct{}
 
 // List 获取库列表（带统计信息）
 // @Summary 获取库列表
-// @Description 分页获取所有文档库，支持按名称搜索和排序
+// @Description 分页获取所有文档库，支持按名称搜索（语义向量搜索优先，模糊匹配降级）和排序
 // @Tags Libraries
 // @Accept json
 // @Produce json
-// @Param name query string false "库名称（模糊搜索）"
+// @Param name query string false "库名称（支持语义搜索，如 'web framework' 可匹配 'Gin'、'Echo' 等）"
 // @Param status query string false "库状态（可选）"
 // @Param sort query string false "排序方式：popular(热门) 或 recent(最新，默认)"
 // @Param page query int false "页码，默认 1" default(1)

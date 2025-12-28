@@ -18,6 +18,7 @@ import (
 	"go-mcp-context/pkg/utils"
 
 	"github.com/lib/pq"
+	"github.com/pgvector/pgvector-go"
 )
 
 type LibraryService struct{}
@@ -109,7 +110,33 @@ func (s *LibraryService) Create(req *request.LibraryCreate) (*dbmodel.Library, e
 		return nil, err
 	}
 
+	// 异步生成向量
+	go s.generateLibraryEmbedding(library.ID, library.Name, library.Description)
+
 	return library, nil
+}
+
+// generateLibraryEmbedding 异步生成库的向量表示
+func (s *LibraryService) generateLibraryEmbedding(libraryID uint, name, description string) {
+	// 拼接 name 和 description
+	textToEmbed := fmt.Sprintf("%s: %s", name, description)
+
+	// 生成向量（使用 CachedEmbeddingService，自动缓存）
+	embedding, err := global.Embedding.Embed(textToEmbed)
+	if err != nil {
+		log.Printf("[LibraryService] Failed to generate embedding for library %d: %v", libraryID, err)
+		return
+	}
+
+	// 更新数据库
+	if err := global.DB.Model(&dbmodel.Library{}).
+		Where("id = ?", libraryID).
+		Update("embedding", pgvector.NewVector(embedding)).Error; err != nil {
+		log.Printf("[LibraryService] Failed to update embedding for library %d: %v", libraryID, err)
+		return
+	}
+
+	log.Printf("[LibraryService] Successfully generated embedding for library %d (%s)", libraryID, name)
 }
 
 // GetByID 根据 ID 获取库
@@ -188,6 +215,9 @@ func (s *LibraryService) InitFromGitHub(ctx context.Context, githubURL string, c
 		return nil, fmt.Errorf("创建库失败: %w", err)
 	}
 
+	// 异步生成向量
+	go s.generateLibraryEmbedding(library.ID, library.Name, library.Description)
+
 	return &InitFromGitHubResult{
 		Library:       library,
 		DefaultBranch: repoInfo.DefaultBranch,
@@ -203,12 +233,20 @@ func (s *LibraryService) Update(id uint, req *request.LibraryUpdate) (*dbmodel.L
 		return nil, err
 	}
 
+	// 只更新 name 和 description 字段，避免触碰 embedding 字段
+	if err := global.DB.Model(&library).Updates(map[string]interface{}{
+		"name":        req.Name,
+		"description": req.Description,
+	}).Error; err != nil {
+		return nil, err
+	}
+
+	// 更新内存中的值以返回最新数据
 	library.Name = req.Name
 	library.Description = req.Description
 
-	if err := global.DB.Save(&library).Error; err != nil {
-		return nil, err
-	}
+	// 异步重新生成向量（因为 name 或 description 已更新）
+	go s.generateLibraryEmbedding(library.ID, library.Name, library.Description)
 
 	return &library, nil
 }
@@ -307,6 +345,7 @@ func (s *LibraryService) GetLibraryInfo(id uint) (*response.LibraryInfo, error) 
 }
 
 // ListWithStats 获取库列表（带统计信息，返回精简字段）
+// 支持语义向量搜索（优先）+ 模糊匹配（降级）
 func (s *LibraryService) ListWithStats(req *request.LibraryList) (*response.PageResult, error) {
 	var libraries []dbmodel.Library
 	var total int64
@@ -315,7 +354,22 @@ func (s *LibraryService) ListWithStats(req *request.LibraryList) (*response.Page
 
 	// 条件过滤
 	if req.Name != nil && *req.Name != "" {
-		db = db.Where("name LIKE ?", "%"+*req.Name+"%")
+		// 尝试向量搜索
+		ctx := context.Background()
+		mcpSvc := &MCPService{searchService: &SearchService{}}
+		vectorLibs, vectorErr := mcpSvc.vectorSearchLibraries(ctx, *req.Name, 50)
+
+		if vectorErr == nil && len(vectorLibs) > 0 {
+			// 向量搜索成功，提取 ID 列表
+			var ids []uint
+			for _, lib := range vectorLibs {
+				ids = append(ids, lib.ID)
+			}
+			db = db.Where("libraries.id IN ?", ids)
+		} else {
+			// 降级到模糊匹配
+			db = db.Where("name LIKE ?", "%"+*req.Name+"%")
+		}
 	}
 	if req.Status != nil && *req.Status != "" {
 		db = db.Where("status = ?", *req.Status)

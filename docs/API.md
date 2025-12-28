@@ -242,10 +242,14 @@ GET /api/v1/libraries
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| name | string | 否 | 按名称模糊搜索 |
+| name | string | 否 | 按名称搜索（支持语义向量搜索，如 "web framework" 可匹配 "Gin"、"Echo" 等） |
 | sort | string | 否 | `popular`（按热度）或 `recent`（按时间，默认） |
 | page | int | 否 | 页码，默认 1 |
 | page_size | int | 否 | 每页数量，默认 10 |
+
+**搜索策略：**
+- 优先使用语义向量搜索（基于 cosine distance）
+- 向量搜索失败或无结果时，降级到 SQL LIKE 模糊匹配
 
 **响应：**
 
