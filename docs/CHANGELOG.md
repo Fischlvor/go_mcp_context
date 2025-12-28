@@ -4,6 +4,47 @@
 
 ---
 
+## 2025-12-28
+
+### Added
+
+- **库名向量搜索（Library Name Vector Search）**
+  - `Library` 模型新增 `embedding` 字段（`vector(1536)`），存储库名+描述的向量表示
+  - 新增 `generateLibraryEmbedding()` 方法：异步生成库的向量（格式：`"{name}: {description}"`）
+  - 新增 `vectorSearchLibraries()` 方法：基于 cosine distance 的语义搜索
+  - 创建 HNSW 索引：`idx_libraries_embedding`（m=16, ef_construction=64）
+  - 库创建时自动异步生成向量（`Create`、`InitFromGitHub`）
+  - 库更新时自动重新生成向量（`Update`）
+
+### Changed
+
+- **search-libraries 搜索策略升级**
+  - 优先使用向量搜索：基于语义相似度进行匹配
+  - 降级到模糊匹配：当向量搜索失败或无结果时，使用 SQL ILIKE 模糊匹配
+  - 复用 `CachedEmbeddingService`：查询向量自动缓存 24 小时
+  - 搜索流程：生成查询向量 → 向量搜索（Top-10）→ 失败则降级到前缀/包含匹配
+
+- **Library 模型字段优化**
+  - `embedding` 字段添加 `default:null` 标签，允许初始值为 NULL
+  - 避免创建库时因空向量导致的 PostgreSQL 验证错误
+
+- **Update 方法优化**
+  - 从 `Save()` 改为 `Updates()`，只更新 `name` 和 `description` 字段
+  - 避免触碰 `embedding` 字段，防止空向量验证错误
+
+### Fixed
+
+- 修复库创建时 `ERROR: vector must have at least 1 dimension` 错误
+- 修复库更新时因 `Save()` 更新所有字段导致的向量验证错误
+
+### Architecture
+
+- 向量搜索与文档搜索使用相同算法：cosine distance + HNSW 索引
+- 向量生成异步化：不阻塞 API 响应，后台任务完成后更新数据库
+- 降级策略：确保在向量未生成或服务故障时仍可使用模糊匹配
+
+---
+
 ## 2025-12-27
 
 ### Added

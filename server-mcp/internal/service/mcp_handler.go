@@ -109,7 +109,7 @@ func (h *MCPHandler) handleToolsList(req *transport.RequestContext, writer trans
 	tools := []map[string]interface{}{
 		{
 			"name":        "search-libraries",
-			"description": "Search for documentation libraries by name. Returns matching libraries with metadata including available versions. Use this method to discover libraries and get their version information (versions array and defaultVersion) before calling get-library-docs.",
+			"description": "Search for documentation libraries by name using semantic vector search (primary) with fuzzy matching fallback. Returns matching libraries with metadata including available versions. Use this method to discover libraries and get their version information (versions array and defaultVersion) before calling get-library-docs.",
 			"inputSchema": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
 	dbmodel "go-mcp-context/internal/model/database"
@@ -10,6 +12,7 @@ import (
 	"go-mcp-context/pkg/global"
 
 	"github.com/agnivade/levenshtein"
+	"github.com/pgvector/pgvector-go"
 )
 
 type MCPService struct {
@@ -24,28 +27,37 @@ func NewMCPService() *MCPService {
 }
 
 // SearchLibraries 搜索库（MCP 工具）
+// 策略：向量搜索优先，模糊匹配降级
 func (s *MCPService) SearchLibraries(req *request.MCPSearchLibraries) (*response.MCPSearchLibrariesResult, error) {
 	var libraries []dbmodel.Library
+	ctx := context.Background()
 
-	// 前缀匹配 + 模糊匹配
-	err := global.DB.Where("status = ? AND name ILIKE ?", "active", req.LibraryName+"%").
-		Order("name ASC").
-		Limit(10).
-		Find(&libraries).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	// 如果前缀匹配结果不足，尝试包含匹配
-	if len(libraries) < 5 {
-		var moreLibraries []dbmodel.Library
-		global.DB.Where("status = ? AND name ILIKE ? AND name NOT ILIKE ?",
-			"active", "%"+req.LibraryName+"%", req.LibraryName+"%").
+	// 1. 尝试向量搜索
+	vectorLibs, vectorErr := s.vectorSearchLibraries(ctx, req.LibraryName, 10)
+	if vectorErr == nil && len(vectorLibs) > 0 {
+		libraries = vectorLibs
+	} else {
+		// 2. 向量搜索失败或无结果，降级到模糊匹配
+		// 前缀匹配
+		err := global.DB.Where("status = ? AND name ILIKE ?", "active", req.LibraryName+"%").
 			Order("name ASC").
-			Limit(10 - len(libraries)).
-			Find(&moreLibraries)
-		libraries = append(libraries, moreLibraries...)
+			Limit(10).
+			Find(&libraries).Error
+
+		if err != nil {
+			return nil, err
+		}
+
+		// 如果前缀匹配结果不足，尝试包含匹配
+		if len(libraries) < 5 {
+			var moreLibraries []dbmodel.Library
+			global.DB.Where("status = ? AND name ILIKE ? AND name NOT ILIKE ?",
+				"active", "%"+req.LibraryName+"%", req.LibraryName+"%").
+				Order("name ASC").
+				Limit(10 - len(libraries)).
+				Find(&moreLibraries)
+			libraries = append(libraries, moreLibraries...)
+		}
 	}
 
 	// 转换为响应格式并计算匹配分数
@@ -235,4 +247,31 @@ func (s *MCPService) GetLibraryByID(id uint) (*dbmodel.Library, error) {
 	}
 
 	return &library, nil
+}
+
+// vectorSearchLibraries 向量搜索库（语义搜索）
+// 返回：库列表、错误
+func (s *MCPService) vectorSearchLibraries(ctx context.Context, queryText string, limit int) ([]dbmodel.Library, error) {
+	// 1. 生成查询向量（使用 CachedEmbeddingService，自动缓存）
+	queryVector, err := global.Embedding.Embed(queryText)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate embedding: %w", err)
+	}
+
+	// 2. 向量搜索（使用 cosine distance）
+	// 设置阈值过滤不相关结果：distance < 0.7 表示相关
+	// cosine distance: 0=完全相同, 1=正交(无关), 2=完全相反
+	// 根据实际测试，相关库的距离通常 < 0.7，不相关的 > 0.7
+	var libraries []dbmodel.Library
+	query := global.DB.Model(&dbmodel.Library{}).
+		Select("*, embedding <=> ? as distance", pgvector.NewVector(queryVector)).
+		Where("status = ? AND embedding IS NOT NULL AND (embedding <=> ?) < 0.7", "active", pgvector.NewVector(queryVector)). // 只返回相关的库
+		Order("distance ASC").
+		Limit(limit)
+
+	if err := query.Find(&libraries).Error; err != nil {
+		return nil, fmt.Errorf("vector search failed: %w", err)
+	}
+
+	return libraries, nil
 }
