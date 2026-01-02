@@ -4,6 +4,7 @@ node_modules/
 # 敏感配置
 server-mcp/configs/config.yaml
 server-mcp/configs/config.prod.yaml
+server-mcp/configs/config.test.yaml
 
 # 部署脚本（包含服务器IP等敏感信息）
 deploy.sh

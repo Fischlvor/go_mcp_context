@@ -72,6 +72,12 @@ go-mcp-context/
 │   │   ├── utils/            # 工具函数
 │   │   └── vectorstore/      # 向量存储
 │   ├── scripts/              # 脚本工具
+│   ├── test/                 # 测试（覆盖率 81.0%）
+│   │   ├── unit/             # 单元测试
+│   │   ├── integration/      # 集成测试
+│   │   ├── README.md         # 测试文档
+│   │   ├── COVERAGE_LIMITATIONS.md  # 覆盖率限制说明
+│   │   └── Makefile          # 测试命令
 │   ├── uploads/              # 上传文件目录
 │   ├── Dockerfile
 │   └── main.go
