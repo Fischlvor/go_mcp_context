@@ -253,6 +253,8 @@ func (s *SearchService) mergeAndRerank(vectorResults, bm25Results []searchCandid
 }
 
 // extractDeepestTitle 从 Metadata 提取最深层级的标题
+// ⚠️ 已注释：此函数从未被使用（死代码）
+/*
 func extractDeepestTitle(metadata dbmodel.JSON) string {
 	if metadata == nil {
 		return ""
@@ -270,6 +272,7 @@ func extractDeepestTitle(metadata dbmodel.JSON) string {
 
 	return ""
 }
+*/
 
 // splitTopics 拆分 topic 字符串（按逗号分隔）
 // 例如 "data fetching, routing" -> ["data fetching", "routing"]

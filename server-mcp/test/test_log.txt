@@ -1,0 +1,64 @@
+所有测试时间: 2026-01-02 20:20:53
+
+🚀 Starting integration tests...
+⚠️  Integration tests will use real external services
+✅ Integration Test Database: mcp_context_test
+✅ Integration Test Redis DB: 15
+✅ Integration test environment initialized
+=== RUN   Test_Integration_GitHubImport_RealAPI
+=== RUN   Test_Integration_GitHubImport_RealAPI/get_real_repo_info_from_github
+    github_import_integration_test.go:49: ✅ Successfully retrieved repo info:
+    github_import_integration_test.go:50:    Name: gorm.io
+    github_import_integration_test.go:51:    Full Name: go-gorm/gorm.io
+    github_import_integration_test.go:52:    Default Branch: master
+    github_import_integration_test.go:53:    Description: GORM official site
+
+······
+
+=== RUN   Test_Stats_GetUserStats/get_user_stats_multiple_times_should_use_cache
+--- PASS: Test_Stats_GetUserStats (6.31s)
+    --- PASS: Test_Stats_GetUserStats/get_user_stats_with_data (0.81s)
+    --- PASS: Test_Stats_GetUserStats/get_user_stats_with_no_data (0.23s)
+    --- PASS: Test_Stats_GetUserStats/get_user_stats_with_multiple_libraries (0.92s)
+    --- PASS: Test_Stats_GetUserStats/cache_works_correctly (0.93s)
+    --- PASS: Test_Stats_GetUserStats/get_user_stats_with_different_user_uuids (0.94s)
+    --- PASS: Test_Stats_GetUserStats/get_user_stats_with_special_uuid_format (0.69s)
+    --- PASS: Test_Stats_GetUserStats/get_user_stats_with_many_libraries (1.29s)
+    --- PASS: Test_Stats_GetUserStats/get_user_stats_multiple_times_should_use_cache (0.50s)
+PASS
+coverage: 76.7% of statements in go-mcp-context/internal/service/...
+✅ Test data preserved for inspection
+🧹 Cleaning up test environment...
+✅ Test environment cleaned up
+ok  	go-mcp-context/test/unit	231.242s	coverage: 76.7% of statements in go-mcp-context/internal/service/...
+
+=== 所有测试完成 ===
+生成时间: 2026-01-02 20:24:44
+
+
+=== 覆盖率统计 ===
+total:							(statements)			81.0%
+
+覆盖率为0的函数: 0 个
+
+前20个最低覆盖率函数:
+37.5%  processor.go:534:                                  ProcessDocumentAsync
+55.6%  library.go:120:                                    generateLibraryEmbedding
+58.8%  library.go:566:                                    DeleteVersion
+58.8%  library.go:782:                                    RefreshVersionWithCallback
+59.6%  github_import.go:50:                               ImportFromGitHub
+61.1%  library.go:647:                                    RefreshVersion
+62.5%  document.go:336:                                   Delete
+70.0%  apikey.go:27:                                      Create
+70.0%  processor.go:84:                                   ProcessDocument
+70.6%  processor.go:552:                                  ProcessDocumentWithCallback
+71.4%  stats.go:30:                                       fetchUserStats
+72.2%  github_import.go:286:                              processFile
+75.0%  apikey.go:109:                                     Delete
+75.0%  apikey.go:84:                                      List
+75.0%  document.go:171:                                   UploadWithCallback
+75.0%  document.go:272:                                   GetByID
+75.0%  processor.go:307:                                  isInCodeBlock
+75.0%  search.go:33:                                      InvalidateLibraryCache
+77.1%  processor.go:366:                                  splitLargeSectionWithMetadata
+78.4%  library.go:349:                                    ListWithStats
