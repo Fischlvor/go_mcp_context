@@ -53,6 +53,29 @@ go-mcp-context 是一个私有化的文档检索服务，通过 MCP 协议为 AI
 - [架构文档](docs/ARCHITECTURE.md) - 技术栈、项目结构、数据模型
 - [部署指南](docs/DEPLOYMENT.md) - 环境配置、Docker 部署、Nginx 配置
 - [开发日志](docs/CHANGELOG.md) - 版本更新记录
+- [测试文档](server-mcp/test/README.md) - 测试使用说明和覆盖率报告
+
+---
+
+## 🧪 测试
+
+![Test Coverage](https://img.shields.io/badge/coverage-81.0%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-passing-success)
+
+- **覆盖率**: 81.0% ✅（目标：80%+）
+- **单元测试**: 11 个测试文件，覆盖所有核心 Service 层
+- **集成测试**: 3 个测试文件，测试跨服务流程
+- **数据库隔离**: 测试使用独立的 `mcp_context_test` 数据库
+
+**快速开始**:
+```bash
+cd server-mcp/test
+make all              # 清理 + 运行所有测试 + 生成覆盖率
+make show-coverage    # 查看覆盖率统计和函数列表
+make coverage-html    # 生成 HTML 覆盖率报告
+```
+
+详情见：[测试文档](server-mcp/test/README.md)
 
 ---
 
