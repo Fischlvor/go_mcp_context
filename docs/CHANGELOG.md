@@ -4,6 +4,52 @@
 
 ---
 
+## 2026-01-02
+
+### Added
+
+- **完整测试系统**
+  - 新增 `server-mcp/test/` 目录：包含单元测试和集成测试
+  - 单元测试：11个测试文件，覆盖所有核心 Service 层
+    - `library_test.go` - LibraryService 测试
+    - `document_test.go` - DocumentService 测试
+    - `processor_test.go` - ProcessorService 测试
+    - `search_test.go` - SearchService 测试
+    - `mcp_test.go` - MCPService 测试
+    - `mcp_handler_test.go` - MCPHandler 测试
+    - `apikey_test.go` - ApiKeyService 测试
+    - `stats_test.go` - StatsService 测试
+    - `activitylog_test.go` - ActivityLogService 测试
+    - `github_import_test.go` - GitHubImportService 测试
+    - `setup_test.go` - 测试环境初始化
+  - 集成测试：3个测试文件
+    - `github_import_integration_test.go` - GitHub 导入集成测试
+    - `mcp_handler_integration_test.go` - MCP 处理器集成测试
+    - `setup_integration_test.go` - 集成测试环境初始化
+  - 测试文档：
+    - `README.md` - 测试使用说明和快速开始
+    - `COVERAGE_LIMITATIONS.md` - 覆盖率限制说明（14个无法优化的函数）
+    - `Makefile` - 测试命令集合（支持实时日志输出）
+  - 测试覆盖率：**81.0%** ✅（目标：80%+）
+  - 数据库隔离：测试使用独立的 `mcp_context_test` 数据库和 Redis DB 15
+
+- **测试配置文件**
+  - 新增 `configs/config.test.yaml` 配置文件
+  - 添加到 `.gitignore` 避免提交敏感信息
+
+### Changed
+
+- **架构文档更新**
+  - `docs/ARCHITECTURE.md` 添加测试目录结构说明
+  - 明确标注测试覆盖率 81.0% 和测试文件数量
+
+### Removed
+
+- **死代码清理**
+  - 注释掉 `search.go` 中的 `extractDeepestTitle()` 函数（从未被使用）
+
+---
+
 ## 2025-12-28
 
 ### Added
