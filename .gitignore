@@ -18,3 +18,9 @@ server-mcp/log/
 # 上传文件
 server-mcp/uploads/*
 !server-mcp/uploads/documents/.gitkeep
+
+# 性能测试配置文件
+docs/performance/docs_update/db_config.py
+
+# Python 缓存
+__pycache__
