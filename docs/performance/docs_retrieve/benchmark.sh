@@ -31,7 +31,7 @@ if [ "$MODE" = "local" ]; then
     echo "本地模式：通过 SSH 在服务器上执行测试..."
     echo ""
     
-    REMOTE_HOST=$REMOTE_HOST
+    REMOTE_HOST=$REMOTE_HOST # 服务器地址
     REMOTE_SCRIPT="/tmp/benchmark_local_$$.sh"
     REMOTE_RESULT="/tmp/benchmark_result_local_$(date +%Y%m%d_%H%M%S).txt"
     
