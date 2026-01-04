@@ -6,17 +6,10 @@
       <!-- 左侧 -->
       <div class="flex w-full items-center justify-between py-4 md:w-auto md:py-0">
         <div class="flex items-center gap-3">
-          <!-- Logo 框 -->
+          <!-- Logo -->
           <router-link class="inline-flex items-center" to="/">
-            <div class="flex h-10 items-center justify-center gap-2 rounded-lg border border-stone-300 bg-white px-3 hover:bg-stone-50">
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="3" width="18" height="18" rx="3" fill="#1c1917"/>
-                <rect x="6" y="6" width="5" height="5" rx="1" fill="#10b981"/>
-                <rect x="13" y="6" width="5" height="5" rx="1" fill="#10b981"/>
-                <rect x="6" y="13" width="5" height="5" rx="1" fill="#10b981"/>
-                <rect x="13" y="13" width="5" height="5" rx="1" fill="#10b981"/>
-              </svg>
-              <span class="text-base font-semibold text-stone-900">Context7</span>
+            <div class="flex h-10 items-center justify-center rounded-lg border border-stone-300 bg-white hover:bg-stone-50">
+              <img src="https://image.hsk423.cn/mcp/media/context7-logo-light.99ff21c1.svg" alt="Context7 Logo" loading="lazy" width="116" height="28" decoding="async" style="color:transparent;height:24px" />
             </div>
           </router-link>
           <!-- 已登录：Personal 下拉菜单 -->
