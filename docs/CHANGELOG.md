@@ -4,6 +4,77 @@
 
 ---
 
+## 2026-01-05
+
+### Added
+
+- **前端 IDE 配置示例**
+  - Dashboard 页面新增 CoStrict IDE 配置示例卡片
+  - 提供完整的 MCP 配置 JSON，方便用户复制使用
+  - 配置包含 `streamable-http` 传输协议和 API Key 认证
+
+### Changed
+
+- **设计文档完善**
+  - 更新 `需求整理和项目规划.md`：修正数据库 Schema 章节
+  - 数据库表定义与实际代码完全对齐（8个表）
+  - 新增 ActivityLog 和 MCPCallLog 表的完整定义
+  - 修正检索流程：从简单加权改为 RRF 算法描述
+  - 修正数据库初始化章节：反映 GORM AutoMigrate 实际使用情况
+  - 修正 MCP 调用日志表的 func_name 字段说明（存储映射后的常量）
+
+---
+
+## 2026-01-04
+
+### Added
+
+- **CoStrict 效果验证文档**
+  - 新增 `docs/effect/CoStrict测试验证方案.md`：完整的 MCP 效果验证文档
+  - 包含 Gin、GORM、TailwindCSS 三个库的测试案例
+  - 详细记录 IDE 集成效果和文档检索准确性
+  - 提供效果对比截图（有文档 vs 无文档）
+
+### Changed
+
+- **前端 Logo 优化**
+  - 更新 `AppHeader.vue` Logo 显示逻辑
+  - 新增 `context7-logo-light.99ff21c1.svg` 矢量图标
+  - 简化 Logo 组件代码
+
+---
+
+## 2026-01-03
+
+### Added
+
+- **性能测试报告**
+  - 新增 `docs/performance/PERFORMANCE_REPORT.md`：完整的性能测试报告
+  - 文档更新性能测试：
+    - 测试脚本：`docs_update_performance_analyze.py`
+    - 图表生成：`docs_update_generate_charts.py`
+    - 测试结果：平均响应时间、吞吐量、性能瓶颈分析
+    - 可视化图表：响应时间分布、吞吐量趋势、负载延迟关系、性能瓶颈
+  - 文档检索性能测试：
+    - 测试脚本：`benchmark.sh`、`benchmark_all.sh`
+    - 图表生成：`generate_charts.py`
+    - 测试结果：13个库的检索性能数据（10次测试取平均）
+    - 可视化图表：MCP 调用时长箱线图、直方图
+  - 测试数据：29个测试结果文件和图表
+
+### Changed
+
+- **性能测试脚本优化**
+  - 文档检索测试支持批量运行（`benchmark_all.sh`）
+  - 自动生成性能报告和可视化图表
+  - 测试结果按时间戳归档
+
+### Fixed
+
+- 删除性能测试脚本中的远程 IP 地址（安全性）
+
+---
+
 ## 2026-01-02
 
 ### Added
