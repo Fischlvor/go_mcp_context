@@ -10,6 +10,8 @@
 
 🌐 **在线体验**: [https://mcp.hsk423.cn](https://mcp.hsk423.cn)
 
+![主页](docs/imgs/homepage.jpg)
+
 </div>
 
 ---
@@ -36,67 +38,85 @@ go-mcp-context 是一个私有化的文档检索服务，通过 MCP 协议为 AI
 
 ## 🚀 快速开始
 
+### 前置条件
+
+- Go 1.23+
+- Node.js 22.15.0+
+- Docker & Docker Compose
+- PostgreSQL 15+ (with pgvector)
+- Redis 6+
+- OpenAI API Key
+
+### 本地开发
+
+```bash
+# 克隆项目
+git clone https://github.com/Fischlvor/go_mcp_context.git
+cd go-mcp-context
+
+# 运行后端
+cd server-mcp
+go run main.go
+
+# 运行前端（新终端）
+cd web-mcp
+nvm use 22.15.0
+npm install
+npm run dev
+```
+
+### 生产部署
+
+```bash
+# 使用部署脚本
+./deploy.sh all
+```
+
 详情见：[部署指南](docs/DEPLOYMENT.md)
 
 ---
 
 ## 🔧 IDE 配置
 
-详情见：[https://mcp.hsk423.cn/dashboard](https://mcp.hsk423.cn/dashboard)
+支持 Cursor、Windsurf、VSCode、Claude Code 等 IDE 和 CoStrict 插件。
+
+配置示例和 API Key 获取：[https://mcp.hsk423.cn/dashboard](https://mcp.hsk423.cn/dashboard)
+
+![Dashboard](docs/imgs/dashboard.jpg)
 
 ---
 
 ## 📚 文档
 
-- [API 文档](docs/API.md) - REST API 和 MCP 工具说明
-- [Swagger API 文档](http://localhost:8090/swagger/index.html) - 交互式 API 文档（本地开发）
+### 设计与规划
+
+- [项目规划](需求整理和项目规划.md) - 需求整理、技术选型、数据库设计
+
+### 架构设计
+
 - [架构文档](docs/ARCHITECTURE.md) - 技术栈、项目结构、数据模型
+- [搜索架构](docs/SEARCH.md) - 混合搜索、RRF 算法、性能优化
+- [缓存架构](docs/CACHE.md) - 多层缓存、Redis 集成、缓存策略
+
+### API 与接口
+
+- [API 文档](docs/API.md) - REST API 接口说明
+- [Swagger API 文档](http://localhost:8090/swagger/index.html) - 交互式 API 文档（需启动后端服务）
+- [MCP 接口文档](docs/MCP.md) - MCP 协议实现和工具定义
+
+### 部署与运维
+
 - [部署指南](docs/DEPLOYMENT.md) - 环境配置、Docker 部署、Nginx 配置
 - [开发日志](docs/CHANGELOG.md) - 版本更新记录
-- [测试文档](server-mcp/test/README.md) - 测试使用说明和覆盖率报告
 
----
+### 测试与验证
 
-## 🧪 测试
-
-![Test Coverage](https://img.shields.io/badge/coverage-81.0%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-passing-success)
-
-- **覆盖率**: 81.0% ✅（目标：80%+）
-- **单元测试**: 11 个测试文件，覆盖所有核心 Service 层
-- **集成测试**: 3 个测试文件，测试跨服务流程
-- **数据库隔离**: 测试使用独立的 `mcp_context_test` 数据库
-
-**快速开始**:
-```bash
-cd server-mcp/test
-make all              # 清理 + 运行所有测试 + 生成覆盖率
-make show-coverage    # 查看覆盖率统计和函数列表
-make coverage-html    # 生成 HTML 覆盖率报告
-```
-
-详情见：[测试文档](server-mcp/test/README.md)
-
----
-
-## 📋 开发计划
-
-### MVP ✅
-
-- [x] MCP 协议端点
-- [x] SSO JWT + API Key 认证
-- [x] 文档解析（Markdown）
-- [x] Embedding 生成（OpenAI）
-- [x] 向量搜索（pgvector）
-- [x] 前端管理界面
-
-### 进行中
-
-- [ ] PDF/DOCX 解析
-- [x] MCP IDE 集成测试
+- [单元测试文档](server-mcp/test/README.md) - 单元测试、集成测试、覆盖率报告（81.0%）
+- [CoStrict 效果验证](docs/effect/CoStrict效果测试验证方案.md) - MCP 集成效果测试方案
+- [性能测试报告](docs/performance/PERFORMANCE_REPORT.md) - 文档更新性能、检索性能、MCP 函数调用性能分析
 
 ---
 
 ## 📄 License
 
-MIT
+[MIT](LICENSE)
